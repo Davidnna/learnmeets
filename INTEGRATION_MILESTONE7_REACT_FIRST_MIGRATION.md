@@ -12,7 +12,7 @@
 ## Required deployment configuration
 Render: set `REACT_FRONTEND_URL` and `FRONTEND_ORIGIN` to the exact Vercel origin; set `COOKIE_SECURE=true` and `SESSION_COOKIE_SAMESITE=None` for separate HTTPS origins. Preserve the existing `SECRET_KEY`, `DATABASE_URL`, and AI provider keys.
 
-Vercel: root directory `frontend`; build `npm run build`; output `dist`; set `VITE_API_BASE_URL` to the Render API URL.
+Vercel: root directory `frontend`; build `npm run build`; output `dist`; set the non-sensitive `API_BASE_URL` to the Render API URL. The Vite config exposes this public URL to the browser bundle.
 
 ## Verification
 Run `python -m py_compile app.py`, then in `frontend/` run `npm install` and `npm run build`. Test login/register, refresh on nested routes, account profile update, password change, chat, upload/delete material, quiz generation/submission, history, and logout against a staging deployment before changing production routing.

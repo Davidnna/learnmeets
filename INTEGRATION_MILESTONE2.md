@@ -32,7 +32,7 @@ This update adds a Flask JSON API and connects the React interface to existing f
 
 ## Deployment caution
 
-Do not switch production traffic to the React UI until these checks pass locally. If frontend and backend have separate origins, configure `VITE_API_BASE_URL` and the exact `FRONTEND_ORIGIN`; use HTTPS and cookie settings documented in `frontend/README.md`. Same-origin routing is preferred because cross-site cookie restrictions can interfere with sessions. Vercel's local filesystem is temporary; this prototype stores extracted document text in the existing database and deletes the temporary source upload after extraction.
+Do not switch production traffic to the React UI until these checks pass locally. If frontend and backend have separate origins, configure the non-sensitive `API_BASE_URL` and the exact `FRONTEND_ORIGIN`; use HTTPS and cookie settings documented in `frontend/README.md`. Same-origin routing is preferred because cross-site cookie restrictions can interfere with sessions. Vercel's local filesystem is temporary; this prototype stores extracted document text in the existing database and deletes the temporary source upload after extraction.
 
 ## Validation performed while preparing this package
 

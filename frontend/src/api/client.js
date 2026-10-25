@@ -1,4 +1,4 @@
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_BASE = (import.meta.env.API_BASE_URL || '').replace(/\/$/, '');
 let csrfToken = '';
 
 async function readPayload(response) {

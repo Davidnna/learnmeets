@@ -7,14 +7,14 @@ This is the primary browser application. React + Vite provides the public pages,
 1. From the project root, create/activate your Python environment and install `requirements.txt`.
 2. Configure the root `.env` using your existing database URL and secrets.
 3. Start the Flask API: `python app.py`.
-4. In this folder, copy `.env.example` to `.env.local` if needed, leave `VITE_API_BASE_URL` blank for the Vite proxy, then run `npm install` and `npm run dev`.
+4. In this folder, copy `.env.example` to `.env.local` if needed, leave `API_BASE_URL` blank for the Vite proxy, then run `npm install` and `npm run dev`.
 5. Open the Vite URL shown in the terminal (normally `http://localhost:5173`).
 
 ## Deploy React to Vercel
 
 - Set the Vercel project root directory to `frontend`.
 - Build command: `npm run build`. Output directory: `dist`.
-- Set `VITE_API_BASE_URL` to the full HTTPS URL of the Flask API on Render.
+- Set the non-sensitive Vercel environment variable `API_BASE_URL` to the full HTTPS URL of the Flask API on Render (for example, `https://learnmates.onrender.com`). The Vite config explicitly exposes this public URL to the browser bundle; do not store secrets in it. Redeploy after changing the variable.
 - Keep the SPA rewrite in `vercel.json` so client-side routes such as `/account` and `/history` load correctly.
 
 ## Configure Flask on Render
