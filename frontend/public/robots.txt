@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://learnmeets.vercel.app/sitemap.xml
