@@ -170,9 +170,15 @@ To show the initial and repair AI response when quiz generation fails, set the R
 
 Digital PDF text is extracted first. PDF pages with little or no selectable text are rendered with PyMuPDF and sent to Groq's vision-capable model for transcription. Configure `GROQ_API_KEY` in Render and, optionally, `GROQ_VISION_MODEL` (default: `qwen/qwen3.8-27b`) and `OCR_TIMEOUT_SECONDS` (default: `90`). OCR is performed during upload, so very large scanned documents may take longer and consume additional provider usage. Clear printed scans work best; handwriting, low resolution, and complex tables may be imperfect. The existing text-only quiz model remains responsible for generating questions from the extracted text.
 
-## Google OAuth branding assets and public policy URLs
 
-- A 512 × 512 PNG version of the existing brand mark is included at `frontend/public/brand-mark.png` (also `static/brand-mark.png`). Upload this PNG in Google Auth Platform → Branding → App logo. The SVG used by the website remains unchanged.
-- Privacy policy URL: `https://learnmeets.vercel.app/privacy`
-- Terms of service URL: `https://learnmeets.vercel.app/terms`
-- These URLs become live after deploying this version of the frontend. Review the policy text and update contact/retention details to match the actual service before submitting it to Google. The included terms are a starter template, not legal advice.
+## Password-registration email verification (Render)
+
+The backend supports an HTTPS email API provider as well as SMTP. On Render Free, direct SMTP connections to ports 25, 465, and 587 are blocked, so use the Nylas transactional-send API path instead of Gmail SMTP.
+
+1. Create a Nylas account and register a free Nylas-branded domain such as `your-app.nylas.email` in its dashboard (no custom domain purchase or DNS setup is needed for this trial domain). Transactional Send is currently documented by Nylas as a beta feature; confirm that it is enabled for your account.
+2. Create an API key and note the exact registered Nylas domain name.
+3. In Render, add `EMAIL_PROVIDER=nylas`, `NYLAS_API_KEY`, `NYLAS_DOMAIN` (the registered `*.nylas.email` domain only, no protocol), `NYLAS_FROM_EMAIL` (an address such as `no-reply@your-app.nylas.email` on that domain), and `NYLAS_API_BASE=https://api.us.nylas.com` if your Nylas account is in the US region. Use the API base for your actual account region if different.
+4. Keep `BACKEND_PUBLIC_URL=https://learnmates.onrender.com`. Keep existing `SECRET_KEY`, `DATABASE_URL`, Groq, Google OAuth, and frontend settings unchanged. Do not put API keys in Git or the frontend.
+5. Deploy the backend patch and test by registering with an email address different from the Nylas account email. Check Render logs and Nylas delivery events. Do not consider this complete until a real verification link arrives and opens successfully.
+
+This patch does not change the verification-token format, expiry, database schema, student records, or Google OAuth flow. SMTP remains available by setting `EMAIL_PROVIDER=smtp` on a host that permits outbound SMTP.

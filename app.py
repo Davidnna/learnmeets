@@ -74,24 +74,75 @@ if oauth and os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET")
         client_kwargs={"scope": "openid email profile"},
     )
 
+def _email_provider():
+    return os.getenv("EMAIL_PROVIDER", "smtp").strip().lower()
+
+
 def _email_verification_configured():
+    provider = _email_provider()
+    if provider == "nylas":
+        return bool(os.getenv("NYLAS_API_KEY") and os.getenv("NYLAS_DOMAIN") and os.getenv("NYLAS_FROM_EMAIL"))
     return bool(os.getenv("SMTP_HOST") and os.getenv("MAIL_FROM"))
+
 
 def _send_verification_email(user):
     if not _email_verification_configured():
-        raise RuntimeError("Email verification is not configured yet. Please set SMTP_HOST and MAIL_FROM on the backend.")
+        if _email_provider() == "nylas":
+            raise RuntimeError("Nylas email is not configured. Set NYLAS_API_KEY, NYLAS_DOMAIN, and NYLAS_FROM_EMAIL.")
+        raise RuntimeError("Email verification is not configured yet. Set SMTP_HOST and MAIL_FROM, or select EMAIL_PROVIDER=nylas and configure Nylas.")
     serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="learnmeets-email-verification")
     token = serializer.dumps({"user_id": user.id, "email": user.email})
     api_base = os.getenv("BACKEND_PUBLIC_URL", request.url_root.rstrip("/"))
     verify_url = f"{api_base.rstrip('/')}/api/auth/verify-email?token={token}"
-    message = EmailMessage()
-    message["Subject"] = "Verify your LearnMeets AI email"
-    message["From"] = os.getenv("MAIL_FROM")
-    message["To"] = user.email
-    message.set_content(
+    subject = "Verify your LearnMeets AI email"
+    body = (
         f"Hi {user.name},\n\nPlease verify your email address to activate your LearnMeets AI account.\n\n"
         f"Verify your email: {verify_url}\n\nThis link expires in 24 hours. If you did not create this account, you can ignore this message."
     )
+
+    if _email_provider() == "nylas":
+        # Nylas transactional email uses HTTPS, avoiding Render's blocked SMTP ports.
+        import urllib.error
+        import urllib.request
+        domain = os.getenv("NYLAS_DOMAIN", "").strip().lower()
+        api_base = os.getenv("NYLAS_API_BASE", "https://api.us.nylas.com").strip().rstrip("/")
+        sender = os.getenv("NYLAS_FROM_EMAIL", "").strip()
+        if not domain or not sender.lower().endswith("@" + domain):
+            raise RuntimeError("NYLAS_FROM_EMAIL must use the registered NYLAS_DOMAIN.")
+        payload = {
+            "to": [{"name": user.name, "email": user.email}],
+            "from": {"name": "LearnMeets AI", "email": sender},
+            "subject": subject,
+            "body": body,
+        }
+        req = urllib.request.Request(
+            f"{api_base}/v3/domains/{domain}/messages/send",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {os.getenv('NYLAS_API_KEY', '').strip()}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as response:
+                response_body = response.read().decode("utf-8", errors="replace")
+                if response.status < 200 or response.status >= 300:
+                    raise RuntimeError(f"Nylas email API returned HTTP {response.status}.")
+        except urllib.error.HTTPError as exc:
+            # Do not log the API key or full request headers.
+            detail = exc.read().decode("utf-8", errors="replace")[:500]
+            raise RuntimeError(f"Nylas email API returned HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Could not reach the Nylas email API over HTTPS: {exc.reason}") from exc
+        return
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = os.getenv("MAIL_FROM")
+    message["To"] = user.email
+    message.set_content(body)
     host = os.getenv("SMTP_HOST")
     port = int(os.getenv("SMTP_PORT", "587"))
     with smtplib.SMTP(host, port, timeout=15) as server:
@@ -100,7 +151,6 @@ def _send_verification_email(user):
         if os.getenv("SMTP_USERNAME"):
             server.login(os.getenv("SMTP_USERNAME"), os.getenv("SMTP_PASSWORD", ""))
         server.send_message(message)
-
 def _frontend_redirect(path):
     frontend = os.getenv("REACT_FRONTEND_URL", "").rstrip("/")
     return redirect(f"{frontend}{path}" if frontend else path)
