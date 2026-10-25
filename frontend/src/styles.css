@@ -54,3 +54,13 @@
 
 /* Milestone 5: navigation and account management */
 .page-back-button{display:grid;place-items:center;flex-shrink:0;background:#f4f2ff;color:#6d5cda;border:1px solid #e8e4ff}.page-back-button:hover{background:#ebe7ff}.account-layout{display:grid;grid-template-columns:minmax(220px,.72fr) minmax(0,1.3fr);gap:16px;margin-top:22px;align-items:start}.account-profile-card{text-align:center;padding:28px 20px}.account-avatar{width:78px;height:78px;border-radius:25px;margin:0 auto 14px;display:grid;place-items:center;background:linear-gradient(135deg,#8e7af1,#5d53cb);color:#fff;font-size:29px;font-weight:800;box-shadow:0 12px 28px #6d5cda30}.account-profile-card h2,.account-form-panel h2{font-family:Manrope,sans-serif;font-size:17px;letter-spacing:-.4px;margin:0 0 7px}.account-profile-card>p,.account-form-panel>p{font-size:11px;color:#8d91a7;line-height:1.7;margin:0 0 14px}.account-profile-card .form-note{margin-top:22px}.account-form-panel{margin-bottom:16px}.account-form-panel .api-inline-form{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin-top:18px}.account-form-panel .api-inline-form label{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:700;color:#555a73}.account-form-panel input{width:100%;min-height:42px;border:1px solid #e6e7f0;border-radius:9px;padding:10px 12px;font:inherit;font-size:12px;color:#373950;background:#fff}.account-form-panel input:focus{outline:2px solid #ded8ff;border-color:#9a8df0}.account-form-panel input[readonly]{background:#f8f8fc;color:#888da2}.account-form-panel label small{font-size:10px;color:#999db0;font-weight:400}.account-form-panel .button{align-self:flex-start}.account-layout>.account-form-panel:nth-child(2){grid-column:2;grid-row:1}.account-layout>.account-form-panel:nth-child(3){grid-column:2;grid-row:2}.account-layout>.account-profile-card{grid-column:1;grid-row:1 / span 2;position:sticky;top:95px}@media(max-width:760px){.account-layout{grid-template-columns:1fr}.account-layout>.account-profile-card,.account-layout>.account-form-panel:nth-child(2),.account-layout>.account-form-panel:nth-child(3){grid-column:1;grid-row:auto}.account-layout>.account-profile-card{position:static}.page-back-button{width:32px;height:32px}}
+
+/* Sidebar overflow fix: keep all navigation and account links reachable on short screens. */
+.sidebar{height:100vh;height:100dvh;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scrollbar-width:thin;scrollbar-color:#d9d5f5 transparent}
+.sidebar>*{flex-shrink:0}
+.sidebar .sidebar-spacer{flex:1 0 15px}
+.sidebar .side-nav{min-height:0}
+.sidebar::-webkit-scrollbar{width:6px}
+.sidebar::-webkit-scrollbar-thumb{background:#d9d5f5;border-radius:8px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+
