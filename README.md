@@ -169,3 +169,10 @@ To show the initial and repair AI response when quiz generation fails, set the R
 ### Scanned PDF OCR (Groq vision)
 
 Digital PDF text is extracted first. PDF pages with little or no selectable text are rendered with PyMuPDF and sent to Groq's vision-capable model for transcription. Configure `GROQ_API_KEY` in Render and, optionally, `GROQ_VISION_MODEL` (default: `qwen/qwen3.8-27b`) and `OCR_TIMEOUT_SECONDS` (default: `90`). OCR is performed during upload, so very large scanned documents may take longer and consume additional provider usage. Clear printed scans work best; handwriting, low resolution, and complex tables may be imperfect. The existing text-only quiz model remains responsible for generating questions from the extracted text.
+
+## Google OAuth branding assets and public policy URLs
+
+- A 512 × 512 PNG version of the existing brand mark is included at `frontend/public/brand-mark.png` (also `static/brand-mark.png`). Upload this PNG in Google Auth Platform → Branding → App logo. The SVG used by the website remains unchanged.
+- Privacy policy URL: `https://learnmeets.vercel.app/privacy`
+- Terms of service URL: `https://learnmeets.vercel.app/terms`
+- These URLs become live after deploying this version of the frontend. Review the policy text and update contact/retention details to match the actual service before submitting it to Google. The included terms are a starter template, not legal advice.
