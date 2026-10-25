@@ -1642,6 +1642,42 @@ def _api_attempt(attempt):
             "created_at": attempt.created_at.isoformat() if attempt.created_at else None}
 
 
+@app.get("/api/debug/auth-status")
+def api_debug_auth_status():
+    """TEMPORARY diagnostic endpoint; remove after Google OAuth is fixed.
+
+    Reports configuration presence only. It never returns credential values.
+    """
+    import importlib.metadata
+    try:
+        authlib_version = importlib.metadata.version("Authlib")
+        authlib_installed = True
+    except importlib.metadata.PackageNotFoundError:
+        authlib_version = None
+        authlib_installed = False
+
+    client_id_present = bool(os.getenv("GOOGLE_CLIENT_ID", "").strip())
+    client_secret_present = bool(os.getenv("GOOGLE_CLIENT_SECRET", "").strip())
+    return jsonify({
+        "diagnostic": "temporary_google_oauth_check",
+        "authlib_import_available": OAuth is not None,
+        "authlib_package_installed": authlib_installed,
+        "authlib_version": authlib_version,
+        "google_client_id_present": client_id_present,
+        "google_client_secret_present": client_secret_present,
+        "oauth_object_created": oauth is not None,
+        "google_oauth_client_initialized": google_oauth is not None,
+        "google_sign_in_enabled": bool(google_oauth),
+        "next_step_hint": (
+            "Authlib is missing or failed to import" if OAuth is None else
+            "One or both Google credential variables are empty/missing" if not (client_id_present and client_secret_present) else
+            "Credentials are present; inspect OAuth initialization and deployed revision"
+            if google_oauth is None else
+            "OAuth client initialized; investigate frontend button/redirect if sign-in still fails"
+        ),
+    })
+
+
 @app.get("/api/session")
 def api_session():
     result = {"authenticated": bool(current_user.is_authenticated), "csrf_token": csrf_token(), "user": None, "google_sign_in_enabled": bool(google_oauth), "email_verification_enabled": _email_verification_configured()}
