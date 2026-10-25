@@ -12,10 +12,15 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+AUTHLIB_IMPORT_ERROR_TYPE = None
+AUTHLIB_IMPORT_ERROR_MESSAGE = None
 try:
     from authlib.integrations.flask_client import OAuth
-except ImportError:  # Google sign-in stays unavailable until Authlib is installed.
+except Exception as exc:  # Temporary diagnostics capture the reason the import failed.
     OAuth = None
+    AUTHLIB_IMPORT_ERROR_TYPE = type(exc).__name__
+    # Only exception metadata is exposed; no environment values or credentials.
+    AUTHLIB_IMPORT_ERROR_MESSAGE = str(exc)[:300]
 import markdown as markdown_lib
 import bleach
 
@@ -1663,6 +1668,8 @@ def api_debug_auth_status():
         "authlib_import_available": OAuth is not None,
         "authlib_package_installed": authlib_installed,
         "authlib_version": authlib_version,
+        "authlib_import_error_type": AUTHLIB_IMPORT_ERROR_TYPE,
+        "authlib_import_error_message": AUTHLIB_IMPORT_ERROR_MESSAGE,
         "google_client_id_present": client_id_present,
         "google_client_secret_present": client_secret_present,
         "oauth_object_created": oauth is not None,
