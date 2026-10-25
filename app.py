@@ -1,14 +1,21 @@
-import os, json, re, secrets, math, random, hmac, warnings, time
-from datetime import datetime, timezone
+import os, json, re, secrets, math, random, hmac, warnings, time, smtplib, base64
+from email.message import EmailMessage
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from functools import wraps
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, redirect, url_for, request, flash, abort, session, jsonify, g
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+try:
+    from authlib.integrations.flask_client import OAuth
+except ImportError:  # Google sign-in stays unavailable until Authlib is installed.
+    OAuth = None
 import markdown as markdown_lib
 import bleach
 
@@ -49,6 +56,49 @@ app.config["UPLOAD_FOLDER"] = str(UPLOAD_DIR)
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
+
+# Optional integrations are activated by environment variables; no credentials are embedded in source.
+oauth = OAuth(app) if OAuth else None
+google_oauth = None
+if oauth and os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"):
+    google_oauth = oauth.register(
+        name="google",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+
+def _email_verification_configured():
+    return bool(os.getenv("SMTP_HOST") and os.getenv("MAIL_FROM"))
+
+def _send_verification_email(user):
+    if not _email_verification_configured():
+        raise RuntimeError("Email verification is not configured yet. Please set SMTP_HOST and MAIL_FROM on the backend.")
+    serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="learnmeets-email-verification")
+    token = serializer.dumps({"user_id": user.id, "email": user.email})
+    api_base = os.getenv("BACKEND_PUBLIC_URL", request.url_root.rstrip("/"))
+    verify_url = f"{api_base.rstrip('/')}/api/auth/verify-email?token={token}"
+    message = EmailMessage()
+    message["Subject"] = "Verify your LearnMeets AI email"
+    message["From"] = os.getenv("MAIL_FROM")
+    message["To"] = user.email
+    message.set_content(
+        f"Hi {user.name},\n\nPlease verify your email address to activate your LearnMeets AI account.\n\n"
+        f"Verify your email: {verify_url}\n\nThis link expires in 24 hours. If you did not create this account, you can ignore this message."
+    )
+    host = os.getenv("SMTP_HOST")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    with smtplib.SMTP(host, port, timeout=15) as server:
+        if os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes"}:
+            server.starttls()
+        if os.getenv("SMTP_USERNAME"):
+            server.login(os.getenv("SMTP_USERNAME"), os.getenv("SMTP_PASSWORD", ""))
+        server.send_message(message)
+
+def _frontend_redirect(path):
+    frontend = os.getenv("REACT_FRONTEND_URL", "").rstrip("/")
+    return redirect(f"{frontend}{path}" if frontend else path)
 
 
 def csrf_token():
@@ -148,6 +198,9 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="student")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    email_verified = db.Column(db.Boolean, nullable=False, default=True)
+    auth_provider = db.Column(db.String(20), nullable=False, default="password")
+    profile_image = db.Column(db.Text, nullable=True)
 
 
 class LearningDocument(db.Model):
@@ -1101,13 +1154,21 @@ def register():
             flash("Enter your name, a valid email, and a password of at least 8 characters.", "error")
         elif User.query.filter_by(email=email).first():
             flash("An account with that email already exists.", "error")
+        elif not _email_verification_configured():
+            flash("Email verification is not configured yet. Please try again later.", "error")
         else:
-            user = User(name=name, email=email, password_hash=generate_password_hash(password))
+            user = User(name=name, email=email, password_hash=generate_password_hash(password), email_verified=False, auth_provider="password")
             db.session.add(user)
-            db.session.commit()
-            login_user(user)
-            flash("Welcome! Your account has been created.", "success")
-            return redirect(url_for("dashboard"))
+            try:
+                db.session.flush()
+                _send_verification_email(user)
+                db.session.commit()
+                flash("Account created. Check your email for a verification link before signing in.", "success")
+                return redirect(url_for("login"))
+            except Exception:
+                db.session.rollback()
+                app.logger.exception("Could not send account verification email")
+                flash("We couldn't send your verification email. Please try again later.", "error")
     return render_template("register.html")
 
 
@@ -1118,6 +1179,9 @@ def login():
         password = request.form.get("password", "")
         user = User.query.filter_by(email=email).first()
         if user and check_password_hash(user.password_hash, password):
+            if not user.email_verified:
+                flash("Please verify your email before signing in.", "error")
+                return redirect(url_for("login"))
             login_user(user)
             return redirect(url_for("dashboard"))
         flash("Email or password was not recognized.", "error")
@@ -1564,7 +1628,7 @@ def admin():
 # React frontend JSON API. These endpoints reuse the existing models and AI
 # helpers; the original HTML routes remain available during migration.
 def _api_user(user):
-    return {"id": user.id, "name": user.name, "email": user.email, "role": user.role}
+    return {"id": user.id, "name": user.name, "email": user.email, "role": user.role, "profile_image": user.profile_image, "email_verified": bool(user.email_verified), "auth_provider": user.auth_provider or "password"}
 
 
 def _api_document(doc):
@@ -1580,7 +1644,7 @@ def _api_attempt(attempt):
 
 @app.get("/api/session")
 def api_session():
-    result = {"authenticated": bool(current_user.is_authenticated), "csrf_token": csrf_token(), "user": None}
+    result = {"authenticated": bool(current_user.is_authenticated), "csrf_token": csrf_token(), "user": None, "google_sign_in_enabled": bool(google_oauth), "email_verification_enabled": _email_verification_configured()}
     if current_user.is_authenticated:
         result["user"] = _api_user(current_user)
     return jsonify(result)
@@ -1594,14 +1658,21 @@ def api_register():
     password = str(data.get("password", ""))
     if not name or not email or "@" not in email or len(password) < 8:
         return jsonify(error="Enter your name, a valid email, and a password of at least 8 characters."), 400
+    if not _email_verification_configured():
+        return jsonify(error="Email verification is not configured yet. Please try again later."), 503
     if User.query.filter_by(email=email).first():
         return jsonify(error="An account with that email already exists."), 409
-    user = User(name=name, email=email, password_hash=generate_password_hash(password))
+    user = User(name=name, email=email, password_hash=generate_password_hash(password), email_verified=False, auth_provider="password")
     db.session.add(user)
-    db.session.commit()
-    login_user(user)
-    session.permanent = True
-    return jsonify(user=_api_user(user)), 201
+    try:
+        db.session.flush()
+        _send_verification_email(user)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Could not create account or send verification email")
+        return jsonify(error="We couldn't send your verification email. Check the email address or try again later."), 503
+    return jsonify(message="Account created. Check your email for a verification link before signing in."), 201
 
 
 @app.post("/api/auth/login")
@@ -1612,10 +1683,87 @@ def api_login():
     user = User.query.filter_by(email=email).first()
     if not user or not check_password_hash(user.password_hash, password):
         return jsonify(error="Email or password was not recognized."), 401
+    if not user.email_verified:
+        return jsonify(error="Please verify your email before signing in. Check your inbox for the verification link."), 403
     login_user(user)
     session.permanent = True
     return jsonify(user=_api_user(user))
 
+
+@app.get("/api/auth/verify-email")
+def api_verify_email():
+    token = request.args.get("token", "")
+    serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="learnmeets-email-verification")
+    try:
+        payload = serializer.loads(token, max_age=24 * 60 * 60)
+    except SignatureExpired:
+        return _frontend_redirect("/login?verification=expired")
+    except BadSignature:
+        return _frontend_redirect("/login?verification=invalid")
+    user = db.session.get(User, payload.get("user_id"))
+    if not user or user.email != payload.get("email"):
+        return _frontend_redirect("/login?verification=invalid")
+    user.email_verified = True
+    db.session.commit()
+    return _frontend_redirect("/login?verification=success")
+
+
+@app.post("/api/auth/resend-verification")
+def api_resend_verification():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email", "")).strip().lower()
+    user = User.query.filter_by(email=email).first()
+    # Generic response avoids revealing whether an email is registered.
+    if user and not user.email_verified and _email_verification_configured():
+        try:
+            _send_verification_email(user)
+        except Exception:
+            app.logger.exception("Could not resend verification email")
+            return jsonify(error="We couldn't send the email right now. Please try again later."), 503
+    return jsonify(message="If an unverified account exists for that address, a new verification email has been sent.")
+
+
+@app.get("/auth/google")
+def google_login():
+    if not google_oauth:
+        return _frontend_redirect("/login?oauth=not-configured")
+    return google_oauth.authorize_redirect(url_for("google_callback", _external=True))
+
+
+@app.get("/auth/google/callback")
+def google_callback():
+    if not google_oauth:
+        return _frontend_redirect("/login?oauth=not-configured")
+    try:
+        token = google_oauth.authorize_access_token()
+        info = token.get("userinfo") or google_oauth.userinfo()
+        email = str(info.get("email", "")).strip().lower()
+        if not email or not info.get("email_verified"):
+            return _frontend_redirect("/login?oauth=email-not-verified")
+        user = User.query.filter_by(email=email).first()
+        if user:
+            # A verified Google identity proves control of this matching email.
+            user.email_verified = True
+            user.auth_provider = "google"
+            if not user.profile_image and info.get("picture"):
+                user.profile_image = str(info["picture"])[:1000]
+            if info.get("name") and user.name == user.email:
+                user.name = str(info["name"])[:100]
+        else:
+            user = User(
+                name=str(info.get("name") or email.split("@", 1)[0])[:100], email=email,
+                password_hash=generate_password_hash(secrets.token_urlsafe(40)), role="student",
+                email_verified=True, auth_provider="google", profile_image=str(info.get("picture") or "")[:1000] or None,
+            )
+            db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        session.permanent = True
+        return _frontend_redirect("/dashboard")
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Google sign-in failed")
+        return _frontend_redirect("/login?oauth=failed")
 
 @app.post("/api/account/profile")
 @login_required
@@ -1625,8 +1773,61 @@ def api_account_profile():
     if not name:
         return jsonify(error="Your name cannot be empty."), 400
     current_user.name = name
+    if "profile_image" in data:
+        image = data.get("profile_image")
+        if image in (None, ""):
+            current_user.profile_image = None
+        elif not isinstance(image, str) or len(image) > 2_000_000 or not re.match(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$", image):
+            return jsonify(error="Choose a PNG, JPEG, or WebP profile picture smaller than 1 MB."), 400
+        else:
+            try:
+                raw_image = base64.b64decode(image.split(",", 1)[1], validate=True)
+                if not raw_image or len(raw_image) > 1_000_000:
+                    raise ValueError("image too large")
+            except (ValueError, base64.binascii.Error):
+                return jsonify(error="The selected profile picture is invalid or too large."), 400
+            current_user.profile_image = image
     db.session.commit()
     return jsonify(user=_api_user(current_user))
+
+
+@app.post("/api/account/delete")
+@login_required
+def api_delete_account():
+    data = request.get_json(silent=True) or {}
+    confirmation = str(data.get("confirm_email", "")).strip().lower()
+    if current_user.auth_provider == "password":
+        password = str(data.get("password", ""))
+        if not password or not check_password_hash(current_user.password_hash, password):
+            return jsonify(error="Enter your current password to confirm account deletion."), 400
+    elif confirmation != current_user.email.lower():
+        return jsonify(error="Enter your email address exactly to confirm account deletion."), 400
+    user_id = current_user.id
+    docs = LearningDocument.query.filter_by(owner_id=user_id).all()
+    uploaded_paths = []
+    for doc in docs:
+        try:
+            candidate = (UPLOAD_DIR / secure_filename(doc.stored_name)).resolve()
+            if candidate.parent == UPLOAD_DIR.resolve():
+                uploaded_paths.append(candidate)
+        except (OSError, ValueError):
+            app.logger.warning("Could not resolve uploaded file for deleted account %s", user_id)
+        db.session.delete(doc)
+    ChatMessage.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    QuizAttempt.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    ActiveQuiz.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    user = db.session.get(User, user_id)
+    db.session.delete(user)
+    db.session.commit()
+    for candidate in uploaded_paths:
+        try:
+            if candidate.exists():
+                candidate.unlink()
+        except OSError:
+            app.logger.warning("Could not remove uploaded file after deleting account %s", user_id)
+    logout_user()
+    session.clear()
+    return jsonify(ok=True)
 
 
 @app.post("/api/account/password")
@@ -1931,6 +2132,17 @@ def too_large(_error):
 
 with app.app_context():
     db.create_all()
+    # Small additive migration: preserve existing accounts and all existing tables/data.
+    user_columns = {column["name"] for column in inspect(db.engine).get_columns("user")}
+    additive_columns = {
+        "email_verified": "BOOLEAN NOT NULL DEFAULT TRUE",
+        "auth_provider": "VARCHAR(20) NOT NULL DEFAULT 'password'",
+        "profile_image": "TEXT",
+    }
+    for column_name, column_type in additive_columns.items():
+        if column_name not in user_columns:
+            db.session.execute(text(f'ALTER TABLE "user" ADD COLUMN {column_name} {column_type}'))
+    db.session.commit()
 
 
 if __name__ == "__main__":

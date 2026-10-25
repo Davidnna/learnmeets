@@ -21,7 +21,7 @@
   <nav id="primary-navigation" aria-label="Primary navigation">
     {% if current_user.is_authenticated %}
       <a href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
-      <a href="{{ url_for('account') }}" {% if request.endpoint == 'account' %}aria-current="page"{% endif %}>Account management</a>
+      <a href="{{ url_for('account') }}" {% if request.endpoint == 'account' %}aria-current="page"{% endif %}>Account</a>
       <a href="{{ url_for('chat') }}" {% if request.endpoint == 'chat' %}aria-current="page"{% endif %}>AI Tutor</a>
       <a href="{{ url_for('materials') }}" {% if request.endpoint in ['materials', 'delete_material'] %}aria-current="page"{% endif %}>My Notes</a>
       <a href="{{ url_for('study_tools') }}" {% if request.endpoint == 'study_tools' %}aria-current="page"{% endif %}>Study Tools</a>

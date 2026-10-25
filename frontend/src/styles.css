@@ -90,3 +90,40 @@
 .progress-panel{margin-top:18px}.progress-attempts{display:grid}.progress-attempt{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0;border-bottom:1px solid #f0eff6}.progress-attempt:last-child{border-bottom:0}.progress-attempt-main{display:flex;align-items:center;gap:12px;min-width:0}.progress-attempt-icon{width:37px;height:37px;display:grid;place-items:center;border-radius:11px;background:#eef0ff;color:#6d5ce8;flex:none}.progress-attempt-main>div{display:grid;gap:5px;min-width:0}.progress-attempt-main strong{font-size:12px;color:#33344f;overflow-wrap:anywhere}.progress-attempt-main small{font-size:10px;color:#9294a8}.progress-score-wrap{width:115px;flex:none;display:grid;gap:7px}.progress-score-wrap>strong{text-align:right;font-size:13px;color:#393653;font-variant-numeric:tabular-nums}.progress-score-track{height:5px;border-radius:999px;overflow:hidden;background:#efedf8}.progress-score-track span{height:100%;display:block;border-radius:999px;background:linear-gradient(90deg,#8c7cf1,#5f50d2)}
 .progress-next-step{display:flex;align-items:center;gap:14px;margin-top:17px;padding:19px;border:1px solid #e9e6fb;border-radius:15px;background:linear-gradient(110deg,#faf9ff,#fff)}.progress-next-icon{width:39px;height:39px;display:grid;place-items:center;flex:none;border-radius:12px;background:#eeeaff;color:#6d5ce8}.progress-next-step>div{flex:1;min-width:0}.progress-next-step strong{font-size:12px;color:#33344f}.progress-next-step p{margin:5px 0 0;font-size:11px;line-height:1.6;color:#8589a0}.progress-next-step .button{flex:none}
 @media(max-width:620px){.global-search{width:35px;min-width:35px;padding:0;justify-content:center;border:0;background:transparent}.global-search span,.global-search kbd{display:none}.workspace-search-backdrop{padding:45px 10px 12px}.workspace-search-dialog{border-radius:14px;max-height:80vh}.workspace-search-input{padding:13px}.workspace-search-footer{font-size:9px}.progress-attempt{align-items:flex-start;gap:12px}.progress-score-wrap{width:75px}.progress-next-step{align-items:flex-start;flex-wrap:wrap}.progress-next-step>div{flex-basis:calc(100% - 60px)}.progress-next-step .button{margin-left:53px}}
+
+/* Milestone 11: clearer language, account identity, profile pictures and accessible icon hints. */
+.nav-caption:last-child{letter-spacing:1px}
+.topbar-avatar img,.public-account-avatar img{width:100%;height:100%;display:block;object-fit:cover;border-radius:inherit}
+.public-account-avatar{display:grid;place-items:center;width:39px;height:39px;flex:none;overflow:hidden;border:1px solid #e6e2fb;border-radius:50%;background:#f0edff;color:#6254cf;font-size:14px;font-weight:800;text-decoration:none}
+.public-account-avatar:hover{box-shadow:0 0 0 4px rgba(109,92,232,.1)}
+.account-avatar{overflow:hidden;position:relative}
+.account-avatar img{width:100%;height:100%;display:block;object-fit:cover;border-radius:inherit}
+.account-avatar span{display:grid;place-items:center;width:100%;height:100%}
+.profile-picture-actions{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin:15px 0 4px}
+.profile-picture-actions label{cursor:pointer}
+.profile-picture-actions label:has(input:disabled){opacity:.7;cursor:wait}
+.account-danger-panel{grid-column:2;border:1px solid #f1dada;background:linear-gradient(180deg,#fff,#fffdfd)}
+.danger-heading{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+.danger-heading>span{width:38px;height:38px;display:grid;place-items:center;flex:none;border-radius:11px;background:#fff0f0;color:#b13d46}
+.danger-heading h2{margin:1px 0 5px;font-size:16px}
+.danger-heading p{margin:0;color:#888ba0;font-size:12px;line-height:1.65}
+.button-danger-outline{border:1px solid #e6b8bc;background:#fff;color:#a52f3a}
+.button-danger-outline:hover{background:#fff3f3;border-color:#d9959b}
+.button-danger{border:1px solid #a92d39;background:#b63843;color:white}
+.button-danger:hover{background:#992c36}
+.danger-warning{padding:12px 14px;border-radius:10px;background:#fff2f2;color:#97333c;font-size:12px;line-height:1.6}
+.danger-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:19px 0;color:#999caf;font-size:11px}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:#ecebf3}
+.button-google{display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid #e5e6ee;background:#fff;color:#36364e;text-decoration:none}
+.button-google:hover{background:#fafaff;border-color:#cfc9f3}
+.verification-actions{display:grid;justify-items:center;gap:11px;padding:8px 0 3px;text-align:center;color:#6c5bd7}
+.verification-actions strong{color:#33344f;font-size:15px}
+.verification-actions p{margin:0 0 5px;color:#8589a0;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.api-message.success{border:1px solid #bfe8d0;background:#f0fbf4;color:#246a43}
+/* Icon-only controls expose a readable hover/focus label even when the native title is absent. */
+button[aria-label]:not([title]),a[aria-label]:not([title]){position:relative}
+button[aria-label]:not([title]):hover::after,button[aria-label]:not([title]):focus-visible::after,a[aria-label]:not([title]):hover::after,a[aria-label]:not([title]):focus-visible::after{content:attr(aria-label);position:absolute;z-index:2000;left:50%;top:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:220px;padding:7px 9px;border:1px solid #38364f;border-radius:7px;background:#29273d;color:#fff;font-size:11px;font-weight:600;line-height:1.3;white-space:normal;box-shadow:0 7px 22px #18152d25;pointer-events:none}
+@media(max-width:760px){.account-danger-panel{grid-column:1}.public-account-avatar{width:35px;height:35px}.danger-actions>*{flex:1}.account-danger-panel .api-inline-form{gap:12px}}
+.auth-resend-link{display:flex;width:100%;justify-content:center;margin:12px 0 0;padding:5px;border:0;background:transparent;cursor:pointer;font-size:11px}
+.auth-resend-link:disabled{opacity:.6;cursor:wait}

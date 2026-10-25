@@ -1,4 +1,5 @@
-const API_BASE = (import.meta.env.API_BASE_URL || '').replace(/\/$/, '');
+export const API_BASE_URL = (import.meta.env.API_BASE_URL || '').replace(/\/$/, '');
+const API_BASE = API_BASE_URL;
 let csrfToken = '';
 
 async function readPayload(response) {
@@ -42,6 +43,8 @@ export const api = {
   logout: () => apiRequest('/api/auth/logout', json('POST', {})),
   updateAccount: (data) => apiRequest('/api/account/profile', json('POST', data)),
   changePassword: (data) => apiRequest('/api/account/password', json('POST', data)),
+  resendVerification: (email) => apiRequest('/api/auth/resend-verification', json('POST', { email })),
+  deleteAccount: (data) => apiRequest('/api/account/delete', json('POST', data)),
   dashboard: () => apiRequest('/api/dashboard'),
   materials: () => apiRequest('/api/materials'),
   uploadMaterial: (formData) => apiRequest('/api/materials', { method: 'POST', body: formData }),
