@@ -1,180 +1,186 @@
-# LearnMeets AI — Student Learning Assistance System
+# LearnMeets AI
 
-Version 6 update: adds local Ollama support and a responsive mobile navigation menu.
+**AI-Based Student Learning Assistance System** — a final-year Computer Science project built with a React/Vite frontend and a Flask/Python backend.
 
-A final-year Computer Science project prototype built with Python, Flask, Flask-Login, Flask-SQLAlchemy, SQLite, HTML/CSS, and optional local Ollama, hosted Groq, OpenAI, or Gemini API integration.
+LearnMeets AI helps students organise course materials, ask questions about their notes, practise with quizzes, review their progress, and access study tools. It also includes account management and a feedback/support workflow.
 
 ## Features
-- Student registration, login, and logout
-- Password hashing
-- AI tutor with optional live model integration and note-grounded responses
-- PDF/TXT upload and text extraction, including PDF page markers for source locations
-- BM25-style keyword retrieval of relevant passages from the selected student-owned notes
-- Retrieved-passage labels ([S1], [S2], etc.) shown in the tutor UI for source transparency
-- Explicit no-match handling so the tutor does not imply unrelated notes support an answer
-- Source-grounded offline fallback when the AI API is not configured
-- Quiz generation with strict JSON/schema validation, distinct answer choices, and verified verbatim evidence quotes when uploaded notes are selected
-- Offline note-based quiz fallback whose correct choices are copied from the selected notes
-- Dashboard score trend visualization for up to the latest seven quiz attempts
-- CSRF protection for POST forms and safer session-cookie defaults
-- Study tools for summaries and revision flashcards from uploaded or pasted material
-- Quiz scoring, history, and performance-based study recommendations
-- Basic administrator dashboard
-- Responsive user interface with a keyboard-operable mobile navigation menu
-- Free local AI support through Ollama, without a hosted API key
+
+- Student registration, login, logout, and session-based authentication.
+- Google sign-in when OAuth credentials are configured.
+- Email verification for password-based registration, plus password reset and email-change confirmation flows.
+- Account profile management, profile-picture upload, account deletion, and password changes for password-based accounts.
+- Upload and manage PDF/TXT study materials, with text extraction and retrieval from the current student's materials.
+- AI tutor responses with optional note-grounded retrieval and source labels.
+- Quiz generation, quiz scoring and review, quiz history, and dashboard progress summaries.
+- Study tools for summaries and revision flashcards.
+- Feedback and support submissions, with protected administrator endpoints for reviewing and responding.
+- Responsive React interface, with a Flask-rendered template interface retained in the backend.
+- Optional hosted AI providers and local Ollama support, depending on configuration and installed models.
+
+## Technology
+
+- **Frontend:** React, Vite, React Router, `lucide-react`, React Markdown.
+- **Backend:** Python, Flask, Flask-Login, Flask-SQLAlchemy.
+- **Database:** SQLite for local development by default; PostgreSQL can be configured with `DATABASE_URL`.
+- **AI:** provider selection through environment variables; hosted provider access requires the corresponding API key.
+- **Email:** SMTP or the Nylas HTTPS API, configured through environment variables.
+- **Deployment:** the React frontend can be hosted separately from the Flask API. The repository includes Vercel configuration for the frontend.
+
+## Project layout
+
+```text
+LearnMeets_AI/
+├── app.py                    # Flask app, API routes, auth and data models
+├── requirements.txt          # Python dependencies
+├── .env.example              # Backend/local environment variable template
+├── templates/                # Flask-rendered pages
+├── static/                   # Flask styles and brand assets
+├── tests/                    # Python tests
+├── scripts/                  # Project verification utilities
+└── frontend/
+    ├── package.json          # Frontend scripts and dependencies
+    ├── vite.config.js        # Vite config and local API proxy
+    ├── vercel.json           # Vercel routing configuration
+    ├── .env.example          # Frontend environment template
+    ├── index.html
+    └── src/                  # React app, API client and styles
+```
 
 ## Requirements
-- Python 3.10 or newer recommended
-- Internet access only for package installation and live AI requests
-- Optional Ollama installation for free local model responses, a Groq API key for hosted free-tier inference, or an OpenAI API key for hosted responses
+
+- Python 3.10 or newer.
+- Node.js and npm compatible with the Vite version installed by `npm install`.
+- A database supported by the configured SQLAlchemy URL.
+- Internet access for installing dependencies and using hosted AI/email services.
+- Optional: an AI provider API key or a local Ollama installation.
 
 ## Run locally
-1. Extract this project folder.
-2. Create and activate a virtual environment:
-   - Windows: `py -m venv .venv` then `.venv\\Scripts\\activate`
-   - macOS/Linux: `python3 -m venv .venv` then `source .venv/bin/activate`
-3. Install dependencies: `pip install -r requirements.txt`
-4. Copy `.env.example` to `.env`.
-5. Set a strong random `SECRET_KEY`. For free local AI, install Ollama, run `ollama pull qwen2.5:3b`, then set `AI_PROVIDER=ollama` in `.env`. For hosted Groq, set `AI_PROVIDER=groq`, `GROQ_API_KEY`, and `GROQ_MODEL=openai/gpt-oss-20b`; for hosted OpenAI, set `AI_PROVIDER=openai` and configure `OPENAI_API_KEY`. Never commit `.env`.
-6. Start the application: `python app.py`
-7. Open `http://127.0.0.1:5000` in your browser.
 
-The database tables are created automatically on first run.
+### 1. Configure and start the Flask backend
 
-## Create an administrator
-Register an account normally, stop the app, then run:
+From the project root:
+
+**Windows PowerShell**
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+**macOS/Linux**
+
 ```bash
-python
->>> from app import app, db, User
->>> with app.app_context():
-...     u = User.query.filter_by(email="your-email@example.com").first()
-...     u.role = "admin"
-...     db.session.commit()
->>> exit()
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
 ```
-Restart the application and use the Admin link. Do not expose this prototype publicly without hardening it.
 
-## Important limitations
-- Without the required key for the selected hosted provider, the app explicitly states that live AI is not configured. When course notes are selected, fallback quiz answers are copied from source sentences; without notes, fallback questions are clearly labeled study-habit demonstrations, not subject assessments.
-- Document retrieval uses a lightweight BM25-style keyword ranker, not embeddings or a vector database. It is a transparent baseline suitable for demonstrating retrieval-augmented generation (RAG), but may miss semantically related passages. Source labels identify the retrieved snippets supplied to the model; they are not a guarantee that the answer is correct or exhaustive.
-- PDF extraction works only for text-based PDFs; scanned image PDFs require OCR, which is not included.
-- The starter is for local academic demonstration. Before production deployment, add email verification/password reset, login rate limiting, robust audit logging, malware scanning, stronger file isolation, database migrations, HTTPS, and operational monitoring. CSRF protection and basic session-cookie flags are included in this prototype, but they do not by themselves make it production-ready.
-- The first registered user is not automatically an administrator.
-- Performance recommendations are simple rules based on quiz scores; this is not a validated predictive model.
+Edit `.env` before running the app. Set a unique, strong `SECRET_KEY`. For local development, `DATABASE_URL` may be left unset to use the configured SQLite default. To use PostgreSQL, provide a valid connection URL. Never commit `.env` or share its secrets.
 
-## Suggested project structure
-```text
-learnmates_ai/
-├── app.py
-├── requirements.txt
-├── .env.example
-├── README.md
-├── DEPLOYMENT_FREE_PILOT.md
-├── docs/requirements-traceability.md
-├── templates/
-│   ├── base.html
-│   ├── index.html
-│   ├── about.html
-│   ├── features.html
-│   ├── how_it_works.html
-│   ├── faq.html
-│   ├── privacy.html
-│   ├── register.html
-│   ├── login.html
-│   ├── dashboard.html
-│   ├── chat.html
-│   ├── materials.html
-│   ├── study_tools.html
-│   ├── quiz.html
-│   ├── quiz_result.html
-│   └── admin.html
-├── static/
-│   ├── style.css
-│   ├── brand-mark.svg
-│   └── favicon.svg
-└── tests/
-    ├── test_accessibility_static.py
-    ├── test_ai_retry.py
-    ├── test_quiz_logic.py
-    ├── test_retrieval.py
-    └── test_smoke.py
+Start the backend:
+
+```bash
+python app.py
 ```
-## Academic integrity
-Use this prototype as a starting point. Run the system yourself, test it, document the actual outcomes, cite external sources in your report, and make sure you can explain each implementation decision during your defense.
 
+The Flask development server normally listens at `http://127.0.0.1:5000`. The `/health` endpoint can be used for a basic health check.
 
-## Version 4 additions
-- Source-grounded quiz generation now requires a verbatim evidence quote from the selected notes, and the correct answer option must match that quote exactly. Invalid AI output is rejected.
-- If AI quiz generation is unavailable or fails validation, a local fallback builds questions from sentences in the selected notes and uses explicitly contradicted alternatives. If there is not enough readable text, the interface says so rather than pretending a content quiz was created.
-- The quiz result page shows the chosen and correct answer text plus supporting source evidence when available.
-- Dashboard includes a compact score-trend bar chart for the latest seven attempts.
-- POST forms require a session CSRF token. Session cookies use HttpOnly and SameSite=Lax defaults; `COOKIE_SECURE=true` should be used behind HTTPS.
+### 2. Configure and start the React frontend
 
-## Verification performed for this package
-- Python syntax compilation passed for `app.py` and test modules.
-- All Jinja templates parsed successfully.
-- Isolated checks passed for note-derived quiz generation, unique answer options, verbatim evidence acceptance, fabricated-evidence rejection, and note retrieval.
-- The full Flask integration test suite could not be run in the build environment because Flask dependencies could not be downloaded. Run `python -m unittest discover -s tests -v` locally after installing requirements.
+Open a second terminal and change into `frontend`:
 
-## Functional requirements and accessibility review
+```bash
+cd frontend
+npm install
+```
 
-The current prototype's core functional scope is: account registration/login/logout; private per-account PDF/TXT note uploads and deletion; question answering with optional note retrieval; study summaries and flashcards; quiz generation/submission/scoring/review; recent performance tracking; and a basic admin usage view. Optional live AI requires a valid API key and network access. An offline fallback is available for selected study workflows; fallback content is explicitly distinguished from live AI output.
+Copy `frontend/.env.example` to `frontend/.env.local` if needed, then configure `API_BASE_URL` only when you want the frontend to call a separately hosted backend. For local development, the Vite development server proxies `/api` and `/health` to `http://127.0.0.1:5000` by default.
 
-### Accessibility and responsive design work in this version
-- Semantic header, primary-navigation landmark, main landmark, and footer; skip-to-main-content link; current-page navigation state.
-- Visible keyboard focus indicators and larger minimum targets for common controls.
-- Proper form labels, helper text for the tutor question, fieldsets/legends for quiz questions, table header scopes, and a tabular alternative to the score chart.
-- - Responsive navigation wrapping and mobile layouts, no external font download requirement, and reduced-motion/forced-colors CSS support.
-- Status and error announcements for flashed messages.
+Start the frontend:
 
-These are accessibility-oriented improvements, not a claim of certified WCAG conformance. Assistive-technology testing remains necessary. Before submission, test all routes using keyboard only, a screen reader (NVDA with Firefox/Chrome or VoiceOver with Safari), 200% browser zoom, a 320 CSS-pixel viewport, Windows High Contrast/forced-colors if available, and an automated checker such as axe. Check the actual color contrast of every state and the focus order in the running application.
+```bash
+npm run dev
+```
 
-### Requirements traceability
-See `docs/requirements-traceability.md` for the implemented scope, test coverage, and items that remain unverified or outside this prototype.
+Open the local URL printed by Vite, usually `http://localhost:5173`.
 
-### Accessibility regression checks
-After installing the requirements, run the full test suite:
+To create a production frontend build:
+
+```bash
+npm run build
+```
+
+The generated build is written to `frontend/dist/`. Do not commit build output unless your deployment process specifically requires it.
+
+## Environment configuration
+
+Use `.env.example` as the reference for backend configuration and `frontend/.env.example` for frontend configuration. Common settings include:
+
+- `SECRET_KEY`: required secret used by Flask sessions; use a strong, unique value in production.
+- `DATABASE_URL`: optional local database URL; set to your hosted PostgreSQL connection string in production.
+- `COOKIE_SECURE`: enable secure session cookies when serving over HTTPS.
+- `SESSION_COOKIE_SAMESITE`: cookie policy. Cross-site frontend/API deployments may require `None` together with secure cookies; test this carefully in the deployed environment.
+- `FRONTEND_ORIGIN`: allowed origin for a separately hosted React frontend.
+- `API_BASE_URL`: public Flask API base URL used by the Vite frontend when deployed separately. It is not a secret; never place API keys in frontend variables.
+- `AI_PROVIDER`: selects the configured AI provider.
+- Provider-specific variables such as `GROQ_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OLLAMA_BASE_URL`, and model names.
+- Email variables such as `EMAIL_PROVIDER`, `NYLAS_API_KEY`, `NYLAS_DOMAIN`, `NYLAS_FROM_EMAIL`, or SMTP settings.
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Google OAuth.
+
+Only configure providers you intend to use. Keep all API keys and other secrets on the backend. On hosting platforms, configure production values in the service's environment-variable settings rather than committing them to the repository.
+
+### AI providers
+
+The application supports provider configuration through environment variables. For hosted inference, configure the matching provider and valid API key/model. For local inference, install Ollama, download a model supported by your machine, and set the Ollama URL and model name. Provider availability, model names, quotas, and prices can change; check the provider's current documentation before deployment.
+
+When an AI provider is unavailable or not configured, some study workflows have local fallbacks. Fallback results may be more limited than live model responses; check the UI and logs when troubleshooting.
+
+### Email verification and password recovery
+
+The backend supports email delivery through SMTP or Nylas HTTPS API configuration. On hosts that block outbound SMTP, use an HTTPS email provider. For Nylas, configure a verified sending domain and sender address in its dashboard, then set the corresponding environment variables in the backend service. Never put the Nylas key in the React frontend. After configuration, test registration, verification links, password reset, and email-change confirmation using a non-production test account before relying on the workflow.
+
+## Administrator access
+
+Administrator privileges are assigned through the backend's user role; creating an ordinary account does not automatically grant admin access. Only promote an account when you are authorised to administer this installation. Confirm the actual database schema and user record before making a role change. Do not expose administrator credentials or grant admin access to student accounts. The backend must enforce authorisation for admin APIs; hiding a link in the frontend is not a security boundary.
+
+## Tests and checks
+
+Install the Python dependencies first, activate the virtual environment, and run the test suite from the project root:
+
 ```bash
 python -m unittest discover -s tests -v
 ```
-The suite includes static checks for semantic landmarks, skip navigation, public information navigation, keyboard focus support, reduced-motion/forced-colors styling, a chart table alternative, and accessible tutor prompt buttons. Static checks do not establish WCAG conformance; follow the manual test checklist above.
 
-## Public information pages
+For the frontend, run the production build from `frontend/`:
 
-Visitors can view the Home, About, Features, How It Works, FAQ, and Privacy pages without registering. An account is required for personal notes, AI chat history, quizzes, and progress records. The privacy page describes the current prototype's data flows and limitations; it is not a replacement for a complete institutional privacy policy.
+```bash
+npm run build
+```
 
-## Hosted Groq API (free-tier pilot)
+A passing syntax check or successful build does not replace functional testing. Before deploying, test registration and sign-in, email verification and recovery, Google OAuth if enabled, account updates, file upload and ownership, AI workflows, quizzes, feedback submissions, admin authorisation, and logout. Check the browser console and backend logs for errors.
 
-The default hosted provider is Groq, using its OpenAI-compatible Chat Completions endpoint. In Render, set `AI_PROVIDER=groq`, `GROQ_API_KEY`, and `GROQ_MODEL=openai/gpt-oss-20b`. The application retries transient failures a limited number of times and can try an optional `GROQ_FALLBACK_MODEL` if you configure a second model that is confirmed available to your account. Check current models and rate limits in [Groq documentation](https://console.groq.com/docs/models) and [rate limits](https://console.groq.com/docs/rate-limits). Free-tier availability and quotas can change; do not send sensitive student data unless the applicable terms and institutional rules permit it.
+## Deployment notes
 
-## Free local AI with Ollama (recommended for development)
+- Deploy the Flask backend and React frontend according to your hosting providers' instructions.
+- Set `API_BASE_URL` to the public backend URL for a separately hosted frontend, and set `FRONTEND_ORIGIN` to the exact public frontend origin on the backend.
+- Use HTTPS and secure cookies in production. Confirm cookie and CORS behaviour when frontend and backend use different origins.
+- Configure the production database URL, secret key, AI provider credentials, email provider, and OAuth credentials in the host dashboard.
+- Run a database backup before schema or application changes. Do not reset the production database as a deployment shortcut.
+- Verify health checks, deployment logs, email delivery, OAuth redirect URIs, and the main student workflows after deployment.
+- Never commit `.env`, access tokens, API keys, database credentials, or real student data.
 
-1. Install Ollama for Windows from https://ollama.com/download/windows.
-2. Open a new PowerShell terminal and download a small model: `ollama pull qwen2.5:3b`. This download can take several minutes and uses disk space.
-3. In the project `.env` file, set `AI_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://localhost:11434/v1`, and `OLLAMA_MODEL=qwen2.5:3b`.
-4. Restart LearnMeets AI (`Ctrl+C`, then `python app.py`). Keep Ollama running in the background.
-5. Check the model is installed with `ollama list`.
+## Known limitations and responsible use
 
-No OpenAI API key is required for Ollama. Response speed depends on your computer's RAM/CPU/GPU. If you prefer hosted OpenAI, set `AI_PROVIDER=openai` and configure `OPENAI_API_KEY`. Never commit `.env` or share API keys.
+- Retrieval quality depends on the text extracted from uploaded documents and the lightweight ranking method; relevant passages can be missed and AI-generated answers can still be incorrect.
+- Text extraction may not work well for scanned PDFs, handwriting, complex layouts, or tables. OCR and vision-provider support depend on the current implementation and provider configuration.
+- AI model access, rate limits, and service availability depend on the selected provider and account.
+- Quiz recommendations and progress summaries are study aids, not validated educational or psychological assessments.
+- This project is an academic application. Before real institutional use, perform a security review, accessibility testing, privacy review, file-upload abuse testing, database migration planning, backup/restore testing, and monitoring setup.
 
-## Render URL note
+## Academic project note
 
-The default `onrender.com` hostname is based on the Render service name. To try to use `https://learnmates.onrender.com`, open the existing web service in the Render Dashboard and rename it to `learnmates` if that name is available. Render may keep the old URL or require creating a new service depending on the service state; verify the hostname shown in Settings before sharing it. The requested name is not guaranteed to be available.
-
-
-### Scanned PDF OCR (Groq vision)
-
-Digital PDF text is extracted first. PDF pages with little or no selectable text are rendered with PyMuPDF and sent to Groq's vision-capable model for transcription. Configure `GROQ_API_KEY` in Render and, optionally, `GROQ_VISION_MODEL` (default: `qwen/qwen3.8-27b`) and `OCR_TIMEOUT_SECONDS` (default: `90`). OCR is performed during upload, so very large scanned documents may take longer and consume additional provider usage. Clear printed scans work best; handwriting, low resolution, and complex tables may be imperfect. The existing text-only quiz model remains responsible for generating questions from the extracted text.
-
-
-## Password-registration email verification (Render)
-
-The backend supports an HTTPS email API provider as well as SMTP. On Render Free, direct SMTP connections to ports 25, 465, and 587 are blocked, so use the Nylas transactional-send API path instead of Gmail SMTP.
-
-1. Create a Nylas account and register a free Nylas-branded domain such as `your-app.nylas.email` in its dashboard (no custom domain purchase or DNS setup is needed for this trial domain). Transactional Send is currently documented by Nylas as a beta feature; confirm that it is enabled for your account.
-2. Create an API key and note the exact registered Nylas domain name.
-3. In Render, add `EMAIL_PROVIDER=nylas`, `NYLAS_API_KEY`, `NYLAS_DOMAIN` (the registered `*.nylas.email` domain only, no protocol), `NYLAS_FROM_EMAIL` (an address such as `no-reply@your-app.nylas.email` on that domain), and `NYLAS_API_BASE=https://api.us.nylas.com` if your Nylas account is in the US region. Use the API base for your actual account region if different.
-4. Keep `BACKEND_PUBLIC_URL=https://learnmates.onrender.com`. Keep existing `SECRET_KEY`, `DATABASE_URL`, Groq, Google OAuth, and frontend settings unchanged. Do not put API keys in Git or the frontend.
-5. Deploy the backend patch and test by registering with an email address different from the Nylas account email. Check Render logs and Nylas delivery events. Do not consider this complete until a real verification link arrives and opens successfully.
-
-This patch does not change the verification-token format, expiry, database schema, student records, or Google OAuth flow. SMTP remains available by setting `EMAIL_PROVIDER=smtp` on a host that permits outbound SMTP.
+Use the application to demonstrate and evaluate the implemented system. Test it yourself, report actual test outcomes, cite external sources in your academic report, and make sure you can explain the architecture and design decisions during your project defence.
