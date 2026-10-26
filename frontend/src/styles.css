@@ -121,9 +121,6 @@
 .verification-actions strong{color:#33344f;font-size:15px}
 .verification-actions p{margin:0 0 5px;color:#8589a0;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .api-message.success{border:1px solid #bfe8d0;background:#f0fbf4;color:#246a43}
-/* Icon-only controls expose a readable hover/focus label even when the native title is absent. */
-button[aria-label]:not([title]),a[aria-label]:not([title]){position:relative}
-button[aria-label]:not([title]):hover::after,button[aria-label]:not([title]):focus-visible::after,a[aria-label]:not([title]):hover::after,a[aria-label]:not([title]):focus-visible::after{content:attr(aria-label);position:absolute;z-index:2000;left:50%;top:calc(100% + 8px);transform:translateX(-50%);width:max-content;max-width:220px;padding:7px 9px;border:1px solid #38364f;border-radius:7px;background:#29273d;color:#fff;font-size:11px;font-weight:600;line-height:1.3;white-space:normal;box-shadow:0 7px 22px #18152d25;pointer-events:none}
 @media(max-width:760px){.account-danger-panel{grid-column:1}.public-account-avatar{width:35px;height:35px}.danger-actions>*{flex:1}.account-danger-panel .api-inline-form{gap:12px}}
 .auth-resend-link{display:flex;width:100%;justify-content:center;margin:12px 0 0;padding:5px;border:0;background:transparent;cursor:pointer;font-size:11px}
 .auth-resend-link:disabled{opacity:.6;cursor:wait}
@@ -142,3 +139,23 @@ button[aria-label]:not([title]):hover::after,button[aria-label]:not([title]):foc
 
 /* Admin feedback and support inbox */
 .admin-support-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:18px 0}.admin-support-metrics>.panel{padding:17px 19px;display:flex;flex-direction:column;gap:7px}.admin-support-metrics span{font-size:12px;color:var(--muted,#77758b)}.admin-support-metrics strong{font-size:27px;line-height:1.1;color:var(--ink,#25213b)}.admin-support-panel{padding:22px;min-width:0}.admin-support-panel .panel-heading{align-items:flex-end;gap:16px;flex-wrap:wrap}.admin-support-filter,.admin-support-editor label{display:grid;gap:7px;font-size:12px;font-weight:700;color:var(--muted,#77758b)}.admin-support-filter select,.admin-support-editor select,.admin-support-editor textarea{width:100%;min-width:0;border:1px solid #e2deef;border-radius:10px;padding:10px 12px;background:#fff;color:var(--ink,#25213b);font:inherit;font-size:13px}.admin-support-filter select,.admin-support-editor select{min-height:42px}.admin-support-editor textarea{resize:vertical;line-height:1.55}.admin-support-editor textarea:focus,.admin-support-editor select:focus,.admin-support-filter select:focus{outline:none;border-color:#8c7be8;box-shadow:0 0 0 3px #8c7be81c}.admin-support-list{display:grid;gap:15px}.admin-support-item{border:1px solid #ebe8f4;border-radius:15px;padding:18px;background:linear-gradient(145deg,#fff,#fcfbff);min-width:0}.admin-support-item-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.admin-support-item h3{font-size:16px;margin:13px 0 5px;overflow-wrap:anywhere}.admin-support-student{font-size:12px;color:var(--muted,#77758b);margin:0 0 12px;overflow-wrap:anywhere}.admin-support-editor{display:grid;gap:12px;margin-top:16px;padding-top:15px;border-top:1px solid #eeeaf7}.admin-support-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.admin-support-actions small{font-size:11px;color:var(--muted,#77758b)}@media(max-width:800px){.admin-support-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-support-panel{padding:16px}}@media(max-width:420px){.admin-support-metrics{gap:9px}.admin-support-metrics>.panel{padding:13px}.admin-support-metrics strong{font-size:23px}.admin-support-item{padding:13px}}
+
+/* LearnMeets UI refinement: branded tooltips, reachable scroll control, clear account actions. */
+[data-tooltip]{position:relative}
+[data-tooltip]::after{content:attr(data-tooltip);position:absolute;left:50%;bottom:calc(100% + 10px);transform:translate(-50%,5px);padding:8px 11px;border:1px solid #ded8ff;border-radius:10px;background:linear-gradient(135deg,#302858,#24213f);color:#fff;font:600 11px/1.35 Inter,system-ui,sans-serif;letter-spacing:.01em;white-space:nowrap;box-shadow:0 10px 24px #29204435;opacity:0;visibility:hidden;pointer-events:none;z-index:3000;transition:opacity .16s ease,transform .16s ease,visibility .16s}
+[data-tooltip]::before{content:"";position:absolute;left:50%;bottom:calc(100% + 4px);width:7px;height:7px;background:#292444;border-right:1px solid #ded8ff;border-bottom:1px solid #ded8ff;transform:translateX(-50%) rotate(45deg);opacity:0;visibility:hidden;z-index:3001;transition:opacity .16s ease}
+[data-tooltip]:hover::after,[data-tooltip]:focus-visible::after,[data-tooltip]:hover::before,[data-tooltip]:focus-visible::before{opacity:1;visibility:visible}
+[data-tooltip]:hover::after,[data-tooltip]:focus-visible::after{transform:translate(-50%,0)}
+/* The scroll control sits clear of the page edge and mobile browser/navigation controls. */
+.scroll-to-top{position:fixed;right:28px;bottom:88px;z-index:120;width:46px;height:46px;border:1px solid #d9d0ff;border-radius:16px;background:linear-gradient(145deg,#8b78f2 0%,#5c48c9 100%);color:#fff;display:grid;place-items:center;box-shadow:0 10px 26px #5942c53b;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,opacity .18s ease}
+.scroll-to-top svg{transform:none}
+.scroll-to-top:hover{transform:translateY(-3px);box-shadow:0 14px 30px #5942c54d}
+.scroll-to-top:focus-visible{outline:3px solid #b8aaff;outline-offset:3px}
+.signout-button:disabled{opacity:.78;cursor:wait;background:#f2efff;color:#6553c5}
+.signout-button .button-spinner{width:17px;height:17px;margin:0;border-color:#d8d0ff;border-top-color:#6754cc}
+.profile-picture-actions{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:16px}
+.remove-picture-button{min-height:34px;padding:7px 11px;border-radius:10px;font-size:12px;font-weight:700;box-shadow:0 2px 5px #a52f3a0b;transition:background .16s ease,border-color .16s ease,transform .16s ease}
+.remove-picture-button:hover:not(:disabled){background:#fff0f1;border-color:#d78a92;transform:translateY(-1px)}
+.remove-picture-button:disabled{opacity:.65;cursor:wait}
+@media(max-width:760px){.scroll-to-top{right:16px;bottom:82px;width:43px;height:43px;border-radius:14px}.profile-picture-actions{gap:8px}}
+@media(prefers-reduced-motion:reduce){[data-tooltip]::after,[data-tooltip]::before,.scroll-to-top,.remove-picture-button{transition:none}}
