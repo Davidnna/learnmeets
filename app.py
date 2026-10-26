@@ -1,4 +1,4 @@
-import os, json, re, secrets, math, random, hmac, warnings, time, smtplib, base64
+import os, json, re, secrets, math, random, hmac, warnings, time, smtplib, base64, html as html_lib
 from email.message import EmailMessage
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -94,11 +94,45 @@ def _send_verification_email(user):
     token = serializer.dumps({"user_id": user.id, "email": user.email})
     api_base = os.getenv("BACKEND_PUBLIC_URL", request.url_root.rstrip("/"))
     verify_url = f"{api_base.rstrip('/')}/api/auth/verify-email?token={token}"
-    subject = "Verify your LearnMeets AI email"
-    body = (
-        f"Hi {user.name},\n\nPlease verify your email address to activate your LearnMeets AI account.\n\n"
-        f"Verify your email: {verify_url}\n\nThis link expires in 24 hours. If you did not create this account, you can ignore this message."
+    subject = "Welcome to LearnMeets AI — verify your email"
+    safe_name = html_lib.escape(str(user.name or "there"))
+    safe_verify_url = html_lib.escape(verify_url, quote=True)
+    text_body = (
+        f"Hi {user.name or 'there'},\n\n"
+        "Welcome to LearnMeets AI! We're glad you're here.\n\n"
+        "Please confirm your email address to activate your account and start learning with your AI study companion.\n\n"
+        f"Verify your email: {verify_url}\n\n"
+        "For your security, this link expires in 24 hours. If you didn't create a LearnMeets AI account, you can safely ignore this email.\n\n"
+        "Happy learning,\nThe LearnMeets AI Team\nhttps://learnmeets.vercel.app"
     )
+    # The logo is served from the public React frontend. Keep the email layout
+    # table-based and styles inline for broad support in Gmail and Outlook.
+    html_body = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Verify your LearnMeets AI email</title></head>
+<body style="margin:0;padding:0;background:#f4f5fb;font-family:Arial,Helvetica,sans-serif;color:#20243a;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">One quick step to activate your LearnMeets AI account.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f5fb;padding:32px 12px;"><tr><td align="center">
+    <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;">
+      <tr><td style="padding:28px 32px;background:#5942c5;background-image:linear-gradient(135deg,#8068f0,#5942c5);">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+          <td style="vertical-align:middle;padding-right:12px;"><img src="https://learnmeets.vercel.app/brand-mark.svg" width="44" height="44" alt="LearnMeets AI" style="display:block;width:44px;height:44px;border:0;border-radius:12px;"></td>
+          <td style="vertical-align:middle;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:-.3px;">LearnMeets <span style="font-weight:400;">AI</span><div style="font-size:12px;font-weight:400;letter-spacing:.3px;margin-top:4px;color:#eeeaff;">Your personal AI study companion</div></td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:36px 32px 20px;">
+        <p style="margin:0 0 12px;font-size:15px;color:#5b5f73;">WELCOME ABOARD</p>
+        <h1 style="margin:0 0 18px;font-size:27px;line-height:1.25;color:#20243a;">Hi {safe_name}, let's get you started.</h1>
+        <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#50556b;">Thanks for joining LearnMeets AI. Confirm your email address to activate your account and start learning with your AI study companion.</p>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:26px 0 24px;"><tr><td align="center" bgcolor="#6550d7" style="border-radius:10px;"><a href="{safe_verify_url}" style="display:inline-block;padding:15px 25px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;border-radius:10px;">Verify my email&nbsp; →</a></td></tr></table>
+        <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#777b8d;">For your security, this link expires in <strong>24 hours</strong>.</p>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:#777b8d;">If the button doesn't work, copy and paste this link into your browser:</p>
+        <p style="margin:8px 0 0;word-break:break-all;font-size:12px;line-height:1.6;"><a href="{safe_verify_url}" style="color:#5942c5;">{safe_verify_url}</a></p>
+      </td></tr>
+      <tr><td style="padding:8px 32px 30px;"><div style="height:1px;background:#ececf4;"></div><p style="margin:22px 0 6px;font-size:14px;line-height:1.6;color:#50556b;">Happy learning,</p><p style="margin:0;font-size:14px;font-weight:700;color:#20243a;">The LearnMeets AI Team</p></td></tr>
+    </table>
+    <p style="max-width:560px;margin:18px auto 0;text-align:center;font-size:12px;line-height:1.7;color:#85899a;">You received this email because an account was created with this address. If that wasn't you, no action is needed.<br><a href="https://learnmeets.vercel.app" style="color:#6550d7;text-decoration:none;">learnmeets.vercel.app</a></p>
+  </td></tr></table>
+</body></html>"""
 
     if _email_provider() == "nylas":
         # Nylas transactional email uses HTTPS, avoiding Render's blocked SMTP ports.
@@ -113,7 +147,7 @@ def _send_verification_email(user):
             "to": [{"name": user.name, "email": user.email}],
             "from": {"name": "LearnMeets AI", "email": sender},
             "subject": subject,
-            "body": body,
+            "body": html_body,
         }
         req = urllib.request.Request(
             f"{api_base}/v3/domains/{domain}/messages/send",
@@ -142,7 +176,8 @@ def _send_verification_email(user):
     message["Subject"] = subject
     message["From"] = os.getenv("MAIL_FROM")
     message["To"] = user.email
-    message.set_content(body)
+    message.set_content(text_body)
+    message.add_alternative(html_body, subtype="html")
     host = os.getenv("SMTP_HOST")
     port = int(os.getenv("SMTP_PORT", "587"))
     with smtplib.SMTP(host, port, timeout=15) as server:
