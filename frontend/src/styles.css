@@ -173,3 +173,17 @@
 .public-scroll-to-top{right:28px;bottom:30px}
 @media(max-width:760px){.public-scroll-to-top{right:16px;bottom:20px}}
 @media(prefers-reduced-motion:reduce){html:focus-within{scroll-behavior:auto}}
+
+/* Milestone 16: viewport-aware LearnMeets tooltips and visible password settings. */
+[data-tooltip]::before,[data-tooltip]::after{content:none!important;display:none!important}
+.lm-tooltip-portal{position:fixed;z-index:10000;max-width:min(280px,calc(100vw - 24px));width:max-content;padding:9px 12px;border:1px solid #cfc6ff;border-radius:11px;background:linear-gradient(145deg,#eeeaff 0%,#ddd5ff 100%);color:#40327f;font:650 11px/1.4 Inter,system-ui,sans-serif;letter-spacing:.01em;text-align:center;white-space:normal;overflow-wrap:anywhere;box-shadow:0 10px 26px rgba(74,57,157,.18),inset 0 1px 0 rgba(255,255,255,.8);pointer-events:none;animation:lm-tooltip-in .12s ease-out}
+.lm-tooltip-portal[hidden]{display:none}
+.lm-tooltip-portal::after{content:"";position:absolute;left:var(--tip-arrow-x,50%);width:7px;height:7px;background:#e4ddff;border:1px solid #cfc6ff;transform:translateX(-50%) rotate(45deg)}
+.lm-tooltip-portal[data-side="top"]::after{bottom:-5px;border-top:0;border-left:0}
+.lm-tooltip-portal[data-side="bottom"]::after{top:-5px;border-bottom:0;border-right:0}
+.account-password-panel{grid-column:1/-1}
+.account-password-panel .password-google-note{display:grid;justify-items:start;gap:12px}
+.account-password-panel .password-google-note p{margin:0;max-width:680px;color:var(--muted,#77758b);font-size:13px;line-height:1.65}
+.account-password-panel .password-google-note .button{display:inline-flex;align-items:center;gap:8px}
+@keyframes lm-tooltip-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.lm-tooltip-portal{animation:none}}
