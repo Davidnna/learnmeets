@@ -121,7 +121,7 @@
 .verification-actions strong{color:#33344f;font-size:15px}
 .verification-actions p{margin:0 0 5px;color:#8589a0;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .api-message.success{border:1px solid #bfe8d0;background:#f0fbf4;color:#246a43}
-@media(max-width:760px){.account-danger-panel{grid-column:1}.public-account-avatar{width:35px;height:35px}.danger-actions>*{flex:1}.account-danger-panel .api-inline-form{gap:12px}}
+@media(max-width:760px){.account-password-panel{grid-column:1}.account-danger-panel{grid-column:1}.public-account-avatar{width:35px;height:35px}.danger-actions>*{flex:1}.account-danger-panel .api-inline-form{gap:12px}}
 .auth-resend-link{display:flex;width:100%;justify-content:center;margin:12px 0 0;padding:5px;border:0;background:transparent;cursor:pointer;font-size:11px}
 .auth-resend-link:disabled{opacity:.6;cursor:wait}
 
@@ -181,7 +181,7 @@
 .lm-tooltip-portal::after{content:"";position:absolute;left:var(--tip-arrow-x,50%);width:7px;height:7px;background:#e4ddff;border:1px solid #cfc6ff;transform:translateX(-50%) rotate(45deg)}
 .lm-tooltip-portal[data-side="top"]::after{bottom:-5px;border-top:0;border-left:0}
 .lm-tooltip-portal[data-side="bottom"]::after{top:-5px;border-bottom:0;border-right:0}
-.account-password-panel{grid-column:1/-1}
+.account-password-panel{grid-column:2;min-width:0;max-width:100%;box-sizing:border-box}
 .account-password-panel .password-google-note{display:grid;justify-items:start;gap:12px}
 .account-password-panel .password-google-note p{margin:0;max-width:680px;color:var(--muted,#77758b);font-size:13px;line-height:1.65}
 .account-password-panel .password-google-note .button{display:inline-flex;align-items:center;gap:8px}
