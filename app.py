@@ -102,7 +102,7 @@ def _send_verification_email(user):
         "Welcome to LearnMeets AI! We're glad you're here.\n\n"
         "Please confirm your email address to activate your account and start learning with your AI study companion.\n\n"
         f"Verify your email: {verify_url}\n\n"
-        "For your security, this link expires in 24 hours. If you didn't create a LearnMeets AI account, you can safely ignore this email.\n\n"
+        "For your security, this link expires in 10 minutes. If you didn't create a LearnMeets AI account, you can safely ignore this email.\n\n"
         "Happy learning,\nThe LearnMeets AI Team\nhttps://learnmeets.vercel.app"
     )
     # The logo is served from the public React frontend. Keep the email layout
@@ -124,7 +124,7 @@ def _send_verification_email(user):
         <h1 style="margin:0 0 18px;font-size:27px;line-height:1.25;color:#20243a;">Hi {safe_name}, let's get you started.</h1>
         <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#50556b;">Thanks for joining LearnMeets AI. Confirm your email address to activate your account and start learning with your AI study companion.</p>
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:26px 0 24px;"><tr><td align="center" bgcolor="#6550d7" style="border-radius:10px;"><a href="{safe_verify_url}" style="display:inline-block;padding:15px 25px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;border-radius:10px;">Verify my email&nbsp; →</a></td></tr></table>
-        <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#777b8d;">For your security, this link expires in <strong>24 hours</strong>.</p>
+        <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#777b8d;">For your security, this link expires in <strong>10 minutes</strong>.</p>
         <p style="margin:0;font-size:13px;line-height:1.6;color:#777b8d;">If the button doesn't work, copy and paste this link into your browser:</p>
         <p style="margin:8px 0 0;word-break:break-all;font-size:12px;line-height:1.6;"><a href="{safe_verify_url}" style="color:#5942c5;">{safe_verify_url}</a></p>
       </td></tr>
@@ -186,6 +186,34 @@ def _send_verification_email(user):
         if os.getenv("SMTP_USERNAME"):
             server.login(os.getenv("SMTP_USERNAME"), os.getenv("SMTP_PASSWORD", ""))
         server.send_message(message)
+def _send_action_email(to_email, to_name, subject, text_body, html_body):
+    """Send security-action email using the configured Nylas HTTPS or SMTP provider."""
+    if not _email_verification_configured():
+        raise RuntimeError("Email delivery is not configured.")
+    if _email_provider() == "nylas":
+        import urllib.error
+        import urllib.request
+        domain = os.getenv("NYLAS_DOMAIN", "").strip().lower()
+        sender = os.getenv("NYLAS_FROM_EMAIL", "").strip()
+        api_base = os.getenv("NYLAS_API_BASE", "https://api.us.nylas.com").strip().rstrip("/")
+        if not domain or not sender.lower().endswith("@" + domain):
+            raise RuntimeError("NYLAS_FROM_EMAIL must use the registered NYLAS_DOMAIN.")
+        payload = {"to": [{"name": to_name or "LearnMeets AI student", "email": to_email}],
+                   "from": {"name": "LearnMeets AI", "email": sender}, "subject": subject, "body": html_body}
+        req = urllib.request.Request(f"{api_base}/v3/domains/{domain}/messages/send", data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {os.getenv('NYLAS_API_KEY', '').strip()}", "Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=20) as response:
+            if response.status < 200 or response.status >= 300:
+                raise RuntimeError(f"Nylas email API returned HTTP {response.status}.")
+        return
+    message = EmailMessage(); message["Subject"] = subject; message["From"] = os.getenv("MAIL_FROM"); message["To"] = to_email
+    message.set_content(text_body); message.add_alternative(html_body, subtype="html")
+    with smtplib.SMTP(os.getenv("SMTP_HOST"), int(os.getenv("SMTP_PORT", "587")), timeout=15) as server:
+        if os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes"}: server.starttls()
+        if os.getenv("SMTP_USERNAME"): server.login(os.getenv("SMTP_USERNAME"), os.getenv("SMTP_PASSWORD", ""))
+        server.send_message(message)
+
+
 def _frontend_redirect(path):
     frontend = os.getenv("REACT_FRONTEND_URL", "").rstrip("/")
     return redirect(f"{frontend}{path}" if frontend else path)
@@ -291,6 +319,20 @@ class User(UserMixin, db.Model):
     email_verified = db.Column(db.Boolean, nullable=False, default=True)
     auth_provider = db.Column(db.String(20), nullable=False, default="password")
     profile_image = db.Column(db.Text, nullable=True)
+
+
+class FeedbackSubmission(db.Model):
+    """Private student feedback, complaints, disputes, and support reports."""
+    id = db.Column(db.Integer, primary_key=True)
+    reference = db.Column(db.String(24), unique=True, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
+    category = db.Column(db.String(30), nullable=False)
+    subject = db.Column(db.String(160), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(30), nullable=False, default="submitted", index=True)
+    admin_reply = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class LearningDocument(db.Model):
@@ -1770,6 +1812,66 @@ def api_debug_auth_status():
     })
 
 
+def _api_feedback(item):
+    return {"id": item.id, "reference": item.reference, "category": item.category,
+            "subject": item.subject, "message": item.message, "status": item.status,
+            "admin_reply": item.admin_reply, "created_at": item.created_at.isoformat() if item.created_at else None,
+            "updated_at": item.updated_at.isoformat() if item.updated_at else None}
+
+
+@app.get("/api/feedback")
+@login_required
+def api_feedback_list():
+    items = FeedbackSubmission.query.filter_by(user_id=current_user.id).order_by(FeedbackSubmission.created_at.desc()).all()
+    return jsonify(submissions=[_api_feedback(item) for item in items])
+
+
+@app.post("/api/feedback")
+@login_required
+def api_feedback_create():
+    data = request.get_json(silent=True) or {}
+    category = str(data.get("category", "")).strip().lower()
+    subject = str(data.get("subject", "")).strip()
+    message = str(data.get("message", "")).strip()
+    allowed = {"feedback", "bug", "complaint", "dispute", "account", "ai-response", "other"}
+    if category not in allowed:
+        return jsonify(error="Choose a valid feedback or support category."), 400
+    if not subject or len(subject) > 160 or len(message) < 10 or len(message) > 5000:
+        return jsonify(error="Add a subject and a description between 10 and 5,000 characters."), 400
+    reference = "LM-" + secrets.token_hex(5).upper()
+    item = FeedbackSubmission(reference=reference, user_id=current_user.id, category=category,
+                              subject=subject, message=message, status="submitted")
+    db.session.add(item)
+    db.session.commit()
+    return jsonify(message="Your submission has been received.", submission=_api_feedback(item)), 201
+
+
+@app.get("/api/admin/feedback")
+@admin_required
+def api_admin_feedback_list():
+    items = FeedbackSubmission.query.order_by(FeedbackSubmission.created_at.desc()).limit(500).all()
+    return jsonify(submissions=[{**_api_feedback(item), "student_name": db.session.get(User, item.user_id).name if db.session.get(User, item.user_id) else "Deleted account", "student_email": db.session.get(User, item.user_id).email if db.session.get(User, item.user_id) else ""} for item in items])
+
+
+@app.post("/api/admin/feedback/<int:submission_id>")
+@admin_required
+def api_admin_feedback_update(submission_id):
+    item = db.session.get(FeedbackSubmission, submission_id)
+    if not item:
+        return jsonify(error="Submission not found."), 404
+    data = request.get_json(silent=True) or {}
+    status = str(data.get("status", item.status)).strip().lower()
+    reply = str(data.get("admin_reply", item.admin_reply or "")).strip()
+    if status not in {"submitted", "under_review", "awaiting_reply", "resolved", "rejected"}:
+        return jsonify(error="Choose a valid status."), 400
+    if len(reply) > 5000:
+        return jsonify(error="The reply is too long."), 400
+    item.status = status
+    item.admin_reply = reply or None
+    db.session.commit()
+    return jsonify(submission=_api_feedback(item))
+
+
 @app.get("/api/session")
 def api_session():
     result = {"authenticated": bool(current_user.is_authenticated), "csrf_token": csrf_token(), "user": None, "google_sign_in_enabled": bool(google_oauth), "email_verification_enabled": _email_verification_configured()}
@@ -1823,7 +1925,7 @@ def api_verify_email():
     token = request.args.get("token", "")
     serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="learnmeets-email-verification")
     try:
-        payload = serializer.loads(token, max_age=24 * 60 * 60)
+        payload = serializer.loads(token, max_age=10 * 60)
     except SignatureExpired:
         return _frontend_redirect("/login?verification=expired")
     except BadSignature:
@@ -1833,7 +1935,10 @@ def api_verify_email():
         return _frontend_redirect("/login?verification=invalid")
     user.email_verified = True
     db.session.commit()
-    return _frontend_redirect("/login?verification=success")
+    # Email ownership is now confirmed; create the authenticated session immediately.
+    login_user(user, fresh=True, remember=False)
+    session.permanent = True
+    return _frontend_redirect("/dashboard?verification=success")
 
 
 @app.post("/api/auth/resend-verification")
@@ -1849,6 +1954,44 @@ def api_resend_verification():
             app.logger.exception("Could not resend verification email")
             return jsonify(error="We couldn't send the email right now. Please try again later."), 503
     return jsonify(message="If an unverified account exists for that address, a new verification email has been sent.")
+
+
+@app.post("/api/auth/forgot-password")
+def api_forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email", "")).strip().lower()[:160]
+    user = User.query.filter_by(email=email).first() if email else None
+    # Always return the same response to avoid account enumeration.
+    if user and user.email_verified and _email_verification_configured():
+        try:
+            serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="learnmeets-password-reset")
+            token = serializer.dumps({"user_id": user.id, "email": user.email})
+            link = f"{os.getenv('REACT_FRONTEND_URL', 'https://learnmeets.vercel.app').rstrip('/')}/reset-password?token={token}"
+            safe_link = html_lib.escape(link, quote=True)
+            _send_action_email(user.email, user.name, "Reset your LearnMeets AI password",
+                f"Hi {user.name or 'there'},\n\nUse this link to reset your password within 10 minutes: {link}\n\nIf you did not request this, ignore this email.",
+                f'<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#20243a"><h1 style="color:#5942c5">Reset your password</h1><p>Hi {html_lib.escape(user.name or "there")},</p><p>We received a request to reset your LearnMeets AI password.</p><p><a href="{safe_link}" style="display:inline-block;background:#6550d7;color:white;padding:13px 20px;border-radius:9px;text-decoration:none;font-weight:bold">Reset password</a></p><p>This link expires in <strong>10 minutes</strong>. If you did not request a reset, you can ignore this email.</p><p>The LearnMeets AI Team</p></div>')
+        except Exception:
+            app.logger.exception("Password reset email delivery failed")
+            return jsonify(error="We couldn't send a reset email right now. Please try again later."), 503
+    return jsonify(message="If a verified account exists for that address, a password-reset link has been sent.")
+
+
+@app.post("/api/auth/reset-password")
+def api_reset_password():
+    data = request.get_json(silent=True) or {}
+    token = str(data.get("token", "")); password = str(data.get("password", ""))
+    if len(password) < 8:
+        return jsonify(error="Choose a password with at least 8 characters."), 400
+    serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="learnmeets-password-reset")
+    try: payload = serializer.loads(token, max_age=10 * 60)
+    except (BadSignature, SignatureExpired): return jsonify(error="This password-reset link is invalid or has expired. Request a new one."), 400
+    user = db.session.get(User, payload.get("user_id"))
+    if not user or user.email != payload.get("email") or not user.email_verified:
+        return jsonify(error="This password-reset link is invalid or has expired. Request a new one."), 400
+    user.password_hash = generate_password_hash(password)
+    db.session.commit()
+    return jsonify(message="Password updated. You can now sign in with your new password.")
 
 
 @app.get("/auth/google")
@@ -1958,6 +2101,50 @@ def api_delete_account():
     return jsonify(ok=True)
 
 
+@app.post("/api/account/email-change")
+@login_required
+def api_request_email_change():
+    data = request.get_json(silent=True) or {}
+    new_email = str(data.get("email", "")).strip().lower()[:160]
+    password = str(data.get("password", ""))
+    if not new_email or "@" not in new_email or len(new_email) > 160:
+        return jsonify(error="Enter a valid email address."), 400
+    if current_user.auth_provider == "password" and not check_password_hash(current_user.password_hash, password):
+        return jsonify(error="Enter your current password to change your email."), 400
+    other = User.query.filter_by(email=new_email).first()
+    if other and other.id != current_user.id:
+        return jsonify(error="That email address is already in use."), 409
+    if new_email == current_user.email.lower(): return jsonify(error="That is already your current email address."), 400
+    if not _email_verification_configured(): return jsonify(error="Email verification is not configured."), 503
+    try:
+        serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="learnmeets-email-change")
+        token = serializer.dumps({"user_id": current_user.id, "old_email": current_user.email, "new_email": new_email})
+        link = f"{os.getenv('BACKEND_PUBLIC_URL', request.url_root.rstrip('/')).rstrip('/')}/api/auth/confirm-email-change?token={token}"
+        safe_link = html_lib.escape(link, quote=True)
+        _send_action_email(new_email, current_user.name, "Confirm your new LearnMeets AI email",
+            f"Hi {current_user.name or 'there'},\n\nConfirm this email change within 10 minutes: {link}\n\nIf you did not request this, ignore this email.",
+            f'<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#20243a"><h1 style="color:#5942c5">Confirm your new email</h1><p>Hi {html_lib.escape(current_user.name or "there")},</p><p>Confirm that you control this address to update your LearnMeets AI account.</p><p><a href="{safe_link}" style="display:inline-block;background:#6550d7;color:white;padding:13px 20px;border-radius:9px;text-decoration:none;font-weight:bold">Confirm email address</a></p><p>This link expires in <strong>10 minutes</strong>.</p></div>')
+    except Exception:
+        app.logger.exception("Email-change confirmation delivery failed")
+        return jsonify(error="We couldn't send a confirmation email right now."), 503
+    return jsonify(message="A confirmation link has been sent to the new email address. Your account email will not change until it is verified.")
+
+
+@app.get("/api/auth/confirm-email-change")
+def api_confirm_email_change():
+    serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="learnmeets-email-change")
+    try: payload = serializer.loads(request.args.get("token", ""), max_age=10 * 60)
+    except (BadSignature, SignatureExpired): return _frontend_redirect("/account?email_change=expired")
+    user = db.session.get(User, payload.get("user_id"))
+    new_email = str(payload.get("new_email", "")).lower()
+    if not user or user.email != payload.get("old_email") or User.query.filter_by(email=new_email).first():
+        return _frontend_redirect("/account?email_change=invalid")
+    user.email = new_email; user.email_verified = True
+    db.session.commit()
+    login_user(user, fresh=True, remember=False); session.permanent = True
+    return _frontend_redirect("/account?email_change=success")
+
+
 @app.post("/api/account/password")
 @login_required
 def api_account_password():
@@ -1977,8 +2164,7 @@ def api_account_password():
 @login_required
 def api_logout():
     logout_user()
-    session.pop("active_quiz_id", None)
-    session.pop("active_quiz", None)
+    session.clear()
     return jsonify(ok=True)
 
 
