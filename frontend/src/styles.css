@@ -187,3 +187,31 @@
 .account-password-panel .password-google-note .button{display:inline-flex;align-items:center;gap:8px}
 @keyframes lm-tooltip-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.lm-tooltip-portal{animation:none}}
+
+
+/* Account layout: prevent long forms and profile controls overflowing narrow screens. */
+.account-layout,.account-layout>*{min-width:0;box-sizing:border-box}
+.account-layout>.account-profile-card{width:100%;max-width:100%}
+.account-profile-card,.account-form-panel,.account-danger-panel{overflow-wrap:anywhere}
+.account-form-panel input,.account-form-panel select,.account-form-panel textarea,.account-form-panel .button{max-width:100%;box-sizing:border-box}
+.profile-picture-actions{display:flex;justify-content:center;align-items:center;gap:9px;flex-wrap:wrap;min-width:0}
+.profile-picture-actions .button{max-width:100%;white-space:normal}
+@media(max-width:760px){
+  .account-layout{grid-template-columns:minmax(0,1fr);gap:13px;width:100%}
+  .account-layout>*{grid-column:1/-1!important;grid-row:auto!important;width:100%;max-width:100%;min-width:0}
+  .account-layout>.account-profile-card{position:static;top:auto;grid-row:auto!important}
+  .account-form-panel,.account-danger-panel{padding:clamp(14px,4vw,20px)}
+  .account-form-panel .api-inline-form{width:100%;min-width:0}
+  .account-form-panel .api-inline-form label{width:100%;min-width:0}
+  .account-form-panel input,.account-form-panel select,.account-form-panel textarea{min-width:0;width:100%}
+  .account-password-panel,.account-danger-panel{grid-column:1/-1!important}
+}
+@media(max-width:480px){
+  .account-layout{gap:11px;margin-top:15px}
+  .account-profile-card{padding:22px 15px!important}
+  .profile-picture-actions{flex-direction:column;align-items:stretch;width:100%}
+  .profile-picture-actions .button{width:100%;justify-content:center}
+  .account-form-panel .button{max-width:100%;white-space:normal}
+  .danger-actions{flex-direction:column;align-items:stretch}
+  .danger-actions .button{width:100%;justify-content:center}
+}

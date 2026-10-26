@@ -184,3 +184,7 @@ A passing syntax check or successful build does not replace functional testing. 
 ## Academic project note
 
 Use the application to demonstrate and evaluate the implemented system. Test it yourself, report actual test outcomes, cite external sources in your academic report, and make sure you can explain the architecture and design decisions during your project defence.
+
+### Support notification emails
+
+Set `SUPPORT_EMAIL` in the backend environment to the address that should receive new student feedback and support submissions. If omitted, the application attempts to notify email addresses on accounts with the `admin` role. Ensure at least one destination is configured. Student email notifications are sent when an administrator adds or changes a reply. Transactional messages use the configured Nylas HTTPS provider or SMTP fallback and share the LearnMeets AI branded email layout.

@@ -186,6 +186,58 @@ def _send_verification_email(user):
         if os.getenv("SMTP_USERNAME"):
             server.login(os.getenv("SMTP_USERNAME"), os.getenv("SMTP_PASSWORD", ""))
         server.send_message(message)
+def _branded_email_html(to_name, eyebrow, title, intro, button_label=None, button_url=None, detail=None, footer_note=None):
+    'Build a consistent, responsive LearnMeets AI transactional email.'
+    safe_name = html_lib.escape(str(to_name or "there"))
+    safe_eyebrow = html_lib.escape(str(eyebrow or "LEARNMEETS AI"))
+    safe_title = html_lib.escape(str(title or "A message from LearnMeets AI"))
+    safe_intro = html_lib.escape(str(intro or "")).replace("\n", "<br>")
+    safe_detail = html_lib.escape(str(detail or "")).replace("\n", "<br>")
+    safe_footer = html_lib.escape(str(footer_note or "")).replace("\n", "<br>")
+    button = ""
+    if button_label and button_url:
+        safe_label = html_lib.escape(str(button_label))
+        safe_url = html_lib.escape(str(button_url), quote=True)
+        button = f'''<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:26px 0 24px"><tr><td align="center" bgcolor="#7566df" style="border-radius:10px"><a href="{safe_url}" style="display:inline-block;padding:14px 23px;color:#fff;text-decoration:none;font-size:15px;font-weight:700;border-radius:10px">{safe_label} &rarr;</a></td></tr></table><p style="font-size:12px;line-height:1.6;color:#777b8d;word-break:break-word">If the button doesn't work, copy this link into your browser:<br><a href="{safe_url}" style="color:#6550d7">{safe_url}</a></p>'''
+    detail_block = f'<p style="margin:18px 0 0;font-size:13px;line-height:1.7;color:#777b8d">{safe_detail}</p>' if safe_detail else ""
+    footer_block = f'<p style="margin:10px 0 0;font-size:12px;line-height:1.6;color:#777b8d">{safe_footer}</p>' if safe_footer else ""
+    return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{safe_title}</title></head>
+<body style="margin:0;padding:0;background:#f4f5fb;font-family:Arial,Helvetica,sans-serif;color:#20243a"><div style="display:none;max-height:0;overflow:hidden;opacity:0">{safe_title} — LearnMeets AI</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f5fb;padding:30px 12px"><tr><td align="center">
+<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#fff;border-radius:18px;overflow:hidden">
+<tr><td style="padding:25px 30px;background:#6550d7;background-image:linear-gradient(135deg,#9385f2,#6550d7)"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="vertical-align:middle;padding-right:12px"><img src="https://learnmeets.vercel.app/brand-mark.svg" width="42" height="42" alt="LearnMeets AI" style="display:block;width:42px;height:42px;border:0;border-radius:11px"></td><td style="vertical-align:middle;color:#fff;font-size:20px;font-weight:700">LearnMeets <span style="font-weight:400">AI</span><div style="font-size:12px;font-weight:400;margin-top:4px;color:#f0edff">Your personal AI study companion</div></td></tr></table></td></tr>
+<tr><td style="padding:34px 30px 25px"><p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:1.1px;color:#7566df">{safe_eyebrow}</p><h1 style="margin:0 0 17px;font-size:26px;line-height:1.25;color:#20243a">{safe_title}</h1><p style="margin:0;font-size:15px;line-height:1.75;color:#50556b">Hi {safe_name},<br><br>{safe_intro}</p>{button}{detail_block}{footer_block}</td></tr>
+<tr><td style="padding:0 30px 28px"><div style="height:1px;background:#ececf4"></div><p style="margin:19px 0 5px;font-size:13px;color:#50556b">Happy learning,</p><p style="margin:0;font-size:13px;font-weight:700;color:#20243a">The LearnMeets AI Team</p></td></tr></table>
+<p style="max-width:560px;margin:16px auto 0;text-align:center;font-size:11px;line-height:1.7;color:#85899a">You received this message because of activity on your LearnMeets AI account.<br><a href="https://learnmeets.vercel.app" style="color:#6550d7;text-decoration:none">learnmeets.vercel.app</a></p>
+</td></tr></table></body></html>'''
+
+
+def _send_admin_notification(subject, text_body, html_body):
+    'Send a notification to configured support email and any active admin accounts.'
+    recipients = set()
+    configured = os.getenv("SUPPORT_EMAIL", "").strip().lower()
+    if configured and "@" in configured:
+        recipients.add(configured)
+    try:
+        for admin in User.query.filter_by(role="admin").all():
+            address = (admin.email or "").strip().lower()
+            if address and "@" in address:
+                recipients.add(address)
+    except Exception:
+        app.logger.exception("Could not look up admin recipients for support notification")
+    if not recipients:
+        app.logger.warning("Support notification not sent: set SUPPORT_EMAIL or configure an admin account email")
+        return False
+    sent_all = True
+    for address in recipients:
+        try:
+            _send_action_email(address, "LearnMeets AI Support", subject, text_body, html_body)
+        except Exception:
+            sent_all = False
+            app.logger.exception("Support notification email delivery failed")
+    return sent_all
+
+
 def _send_action_email(to_email, to_name, subject, text_body, html_body):
     """Send security-action email using the configured Nylas HTTPS or SMTP provider."""
     if not _email_verification_configured():
@@ -1753,6 +1805,11 @@ def api_feedback_create():
                               subject=subject, message=message, status="submitted")
     db.session.add(item)
     db.session.commit()
+    student = current_user
+    admin_subject = f"New LearnMeets AI support submission: {item.reference}"
+    admin_text = (f"A student submitted a new {item.category} report.\n\nReference: {item.reference}\nFrom: {student.name or 'Student'} ({student.email})\nSubject: {item.subject}\n\n{item.message}\n\nSign in to the LearnMeets AI admin support inbox to review and respond.")
+    admin_html = _branded_email_html("Support team", "NEW STUDENT SUBMISSION", f"New {item.category.replace('-', ' ').title()} submission", f"A student has sent feedback or requested support.\n\nReference: {item.reference}\nFrom: {student.name or 'Student'} ({student.email})\nSubject: {item.subject}\n\n{item.message}", None, None, "Sign in to the LearnMeets AI admin support inbox to review this submission and reply.")
+    _send_admin_notification(admin_subject, admin_text, admin_html)
     return jsonify(message="Your submission has been received.", submission=_api_feedback(item)), 201
 
 
@@ -1776,10 +1833,24 @@ def api_admin_feedback_update(submission_id):
         return jsonify(error="Choose a valid status."), 400
     if len(reply) > 5000:
         return jsonify(error="The reply is too long."), 400
+    previous_reply = item.admin_reply or ""
     item.status = status
     item.admin_reply = reply or None
     db.session.commit()
-    return jsonify(submission=_api_feedback(item))
+    email_sent = None
+    if reply and reply != previous_reply:
+        student = db.session.get(User, item.user_id)
+        if student and student.email:
+            subject = f"An update on your LearnMeets AI request ({item.reference})"
+            text_body = (f"Hi {student.name or 'there'},\n\nThe LearnMeets AI support team has responded to your submission.\n\nReference: {item.reference}\nSubject: {item.subject}\nStatus: {item.status.replace('_', ' ').title()}\n\nReply from our team:\n{reply}\n\nSign in to LearnMeets AI and open Feedback & Support to review your submission.")
+            html_body = _branded_email_html(student.name, "SUPPORT UPDATE", "We've responded to your request", f"The LearnMeets AI support team has replied to your submission.\n\nReference: {item.reference}\nSubject: {item.subject}\nStatus: {item.status.replace('_', ' ').title()}", None, None, f"Reply from our team:\n{reply}\n\nSign in to LearnMeets AI and open Feedback & Support to review your submission.")
+            try:
+                _send_action_email(student.email, student.name, subject, text_body, html_body)
+                email_sent = True
+            except Exception:
+                email_sent = False
+                app.logger.exception("Admin reply was saved but the student notification email failed")
+    return jsonify(submission=_api_feedback(item), notification_email_sent=email_sent)
 
 
 @app.get("/api/session")
@@ -1879,8 +1950,8 @@ def api_forgot_password():
             link = f"{os.getenv('REACT_FRONTEND_URL', 'https://learnmeets.vercel.app').rstrip('/')}/reset-password?token={token}"
             safe_link = html_lib.escape(link, quote=True)
             _send_action_email(user.email, user.name, "Reset your LearnMeets AI password",
-                f"Hi {user.name or 'there'},\n\nUse this link to reset your password within 10 minutes: {link}\n\nIf you did not request this, ignore this email.",
-                f'<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#20243a"><h1 style="color:#5942c5">Reset your password</h1><p>Hi {html_lib.escape(user.name or "there")},</p><p>We received a request to reset your LearnMeets AI password.</p><p><a href="{safe_link}" style="display:inline-block;background:#6550d7;color:white;padding:13px 20px;border-radius:9px;text-decoration:none;font-weight:bold">Reset password</a></p><p>This link expires in <strong>10 minutes</strong>. If you did not request a reset, you can ignore this email.</p><p>The LearnMeets AI Team</p></div>')
+                f"Hi {user.name or 'there'},\n\nWe received a request to reset your LearnMeets AI password. Use this link within 10 minutes: {link}\n\nIf you did not request a reset, you can safely ignore this email.",
+                _branded_email_html(user.name, "ACCOUNT SECURITY", "Reset your password", "We received a request to reset your LearnMeets AI password.", "Reset password", link, "For your security, this link expires in 10 minutes. If you did not request a reset, you can safely ignore this email."))
         except Exception:
             app.logger.exception("Password reset email delivery failed")
             return jsonify(error="We couldn't send a reset email right now. Please try again later."), 503
@@ -2032,8 +2103,8 @@ def api_request_email_change():
         link = f"{os.getenv('BACKEND_PUBLIC_URL', request.url_root.rstrip('/')).rstrip('/')}/api/auth/confirm-email-change?token={token}"
         safe_link = html_lib.escape(link, quote=True)
         _send_action_email(new_email, current_user.name, "Confirm your new LearnMeets AI email",
-            f"Hi {current_user.name or 'there'},\n\nConfirm this email change within 10 minutes: {link}\n\nIf you did not request this, ignore this email.",
-            f'<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#20243a"><h1 style="color:#5942c5">Confirm your new email</h1><p>Hi {html_lib.escape(current_user.name or "there")},</p><p>Confirm that you control this address to update your LearnMeets AI account.</p><p><a href="{safe_link}" style="display:inline-block;background:#6550d7;color:white;padding:13px 20px;border-radius:9px;text-decoration:none;font-weight:bold">Confirm email address</a></p><p>This link expires in <strong>10 minutes</strong>.</p></div>')
+            f"Hi {current_user.name or 'there'},\n\nConfirm that you control this address to update your LearnMeets AI account. Use this link within 10 minutes: {link}\n\nIf you did not request this change, you can safely ignore this email.",
+            _branded_email_html(current_user.name, "ACCOUNT SECURITY", "Confirm your new email", "Confirm that you control this address to update your LearnMeets AI account.", "Confirm email address", link, "For your security, this link expires in 10 minutes. Your account email will not change until you confirm this address."))
     except Exception:
         app.logger.exception("Email-change confirmation delivery failed")
         return jsonify(error="We couldn't send a confirmation email right now."), 503
