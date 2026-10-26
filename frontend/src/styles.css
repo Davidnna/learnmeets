@@ -159,3 +159,17 @@
 .remove-picture-button:disabled{opacity:.65;cursor:wait}
 @media(max-width:760px){.scroll-to-top{right:16px;bottom:82px;width:43px;height:43px;border-radius:14px}.profile-picture-actions{gap:8px}}
 @media(prefers-reduced-motion:reduce){[data-tooltip]::after,[data-tooltip]::before,.scroll-to-top,.remove-picture-button{transition:none}}
+
+
+/* LearnMeets AI tooltip refinement: branded, readable and kept inside viewport edges. */
+[data-tooltip]{isolation:isolate}
+[data-tooltip]::after{max-width:min(260px,calc(100vw - 28px));white-space:normal;text-align:center;line-height:1.4;padding:9px 12px;border:1px solid #bfb4ff;border-radius:11px;background:linear-gradient(145deg,#332b60 0%,#211d40 100%);color:#fff;font-size:11px;font-weight:650;letter-spacing:.01em;box-shadow:0 12px 28px rgba(37,28,83,.25),inset 0 1px 0 rgba(255,255,255,.08)}
+[data-tooltip]::before{background:#292349;border-color:#bfb4ff}
+.topbar-actions [data-tooltip]::after,.public-nav-actions [data-tooltip]::after{left:auto;right:0;transform:translateY(5px)}
+.topbar-actions [data-tooltip]:hover::after,.topbar-actions [data-tooltip]:focus-visible::after,.public-nav-actions [data-tooltip]:hover::after,.public-nav-actions [data-tooltip]:focus-visible::after{transform:translateY(0)}
+.topbar-actions [data-tooltip]::before,.public-nav-actions [data-tooltip]::before{left:auto;right:14px}
+.sidebar-brand [data-tooltip]::after,.sidebar-brand [data-tooltip]::before{bottom:auto;top:calc(100% + 9px)}
+.sidebar-brand [data-tooltip]::before{top:calc(100% + 4px);transform:rotate(225deg)}
+.public-scroll-to-top{right:28px;bottom:30px}
+@media(max-width:760px){.public-scroll-to-top{right:16px;bottom:20px}}
+@media(prefers-reduced-motion:reduce){html:focus-within{scroll-behavior:auto}}
