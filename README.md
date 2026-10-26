@@ -162,10 +162,6 @@ No OpenAI API key is required for Ollama. Response speed depends on your compute
 The default `onrender.com` hostname is based on the Render service name. To try to use `https://learnmates.onrender.com`, open the existing web service in the Render Dashboard and rename it to `learnmates` if that name is available. Render may keep the old URL or require creating a new service depending on the service state; verify the hostname shown in Settings before sharing it. The requested name is not guaranteed to be available.
 
 
-## Temporary quiz diagnostics (remove after troubleshooting)
-
-To show the initial and repair AI response when quiz generation fails, set the Render environment variable `QUIZ_DEBUG_ERRORS` to `true` and redeploy. The diagnostics panel appears only on the authenticated quiz page after a failed generation and shows at most 1,200 characters per response. It may expose provider error details or text returned by the model, so use it only temporarily. After diagnosing the issue, set `QUIZ_DEBUG_ERRORS` to `false` (or remove the variable) and redeploy. This does not change the database or student records.
-
 ### Scanned PDF OCR (Groq vision)
 
 Digital PDF text is extracted first. PDF pages with little or no selectable text are rendered with PyMuPDF and sent to Groq's vision-capable model for transcription. Configure `GROQ_API_KEY` in Render and, optionally, `GROQ_VISION_MODEL` (default: `qwen/qwen3.8-27b`) and `OCR_TIMEOUT_SECONDS` (default: `90`). OCR is performed during upload, so very large scanned documents may take longer and consume additional provider usage. Clear printed scans work best; handwriting, low resolution, and complex tables may be imperfect. The existing text-only quiz model remains responsible for generating questions from the extracted text.

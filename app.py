@@ -660,7 +660,7 @@ def _chat_completion_with_retries(client, model, messages, temperature=0.3, atte
     raise last_error
 
 
-def ai_response(prompt, instructions, max_tokens=None, json_mode=False, debug_quiz_response=False):
+def ai_response(prompt, instructions, max_tokens=None, json_mode=False):
     """Generate a response with local Ollama or a hosted provider, with honest fallbacks."""
     provider = os.getenv("AI_PROVIDER", "groq").strip().lower()
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
@@ -727,30 +727,6 @@ def ai_response(prompt, instructions, max_tokens=None, json_mode=False, debug_qu
             message = getattr(choice, "message", None) if choice is not None else None
             content = getattr(message, "content", None) if message is not None else None
             if not content or not str(content).strip():
-                if debug_quiz_response and os.getenv("QUIZ_DEBUG_ERRORS", "false").strip().lower() in {"1", "true", "yes", "on"}:
-                    # Temporary, privacy-conscious diagnostics: report response structure and token
-                    # counts, but never log prompts, document text, API keys, or model reasoning text.
-                    usage = getattr(response, "usage", None)
-                    details = {
-                        "provider": "groq",
-                        "model": getattr(response, "model", None) or model,
-                        "response_id": getattr(response, "id", None),
-                        "choices_count": len(response.choices or []),
-                        "finish_reason": getattr(choice, "finish_reason", None) if choice is not None else None,
-                        "message_role": getattr(message, "role", None) if message is not None else None,
-                        "content_is_none": content is None,
-                        "content_type": type(content).__name__ if content is not None else "NoneType",
-                        "content_chars": len(str(content)) if content is not None else 0,
-                        "refusal_present": bool(getattr(message, "refusal", None)) if message is not None else False,
-                        "reasoning_present": bool(getattr(message, "reasoning", None)) if message is not None else False,
-                        "reasoning_chars": len(str(getattr(message, "reasoning", "") or "")) if message is not None else 0,
-                        "tool_calls_count": len(getattr(message, "tool_calls", None) or []) if message is not None else 0,
-                        "prompt_tokens": getattr(usage, "prompt_tokens", None) if usage is not None else None,
-                        "completion_tokens": getattr(usage, "completion_tokens", None) if usage is not None else None,
-                        "total_tokens": getattr(usage, "total_tokens", None) if usage is not None else None,
-                    }
-                    app.logger.warning("Temporary Groq empty quiz response metadata: %s", json.dumps(details, sort_keys=True))
-                    return "[TEMP GROQ RESPONSE DIAGNOSTICS]\n" + json.dumps(details, indent=2, sort_keys=True)
                 return "The AI provider returned an empty response. Please try again."
             return str(content).strip()
         except Exception as exc:
@@ -760,11 +736,6 @@ def ai_response(prompt, instructions, max_tokens=None, json_mode=False, debug_qu
                 temporary = isinstance(exc, (APIConnectionError, APITimeoutError)) or (isinstance(exc, APIStatusError) and exc.status_code in {429, 500, 502, 503, 504})
             except Exception:
                 temporary = False
-            if os.getenv("QUIZ_DEBUG_ERRORS", "false").strip().lower() in {"1", "true", "yes", "on"}:
-                # TEMPORARY: only enabled by an explicit deployment environment flag.
-                # Bound the detail and avoid ever returning request headers or API keys.
-                detail = re.sub(r"(?i)(authorization|api[_ -]?key|bearer)\s*[:=]?\s*[^\s,;]+", r"\1=[REDACTED]", str(exc))
-                return "[TEMP QUIZ DEBUG - GROQ API ERROR] " + detail[:1200]
             if temporary:
                 return ("The AI service is temporarily busy or its usage limit may have been reached. "
                         "Please wait a moment and try again. Your account and saved study notes have not been deleted.")
@@ -1071,7 +1042,6 @@ def _generate_questions_batch(topic, source_text="", count=10, avoid_questions=N
         # The former 220 tokens/question budget truncated otherwise valid JSON.
         max_tokens=min(10000, max(1800, count * 600)),
         json_mode=True,
-        debug_quiz_response=True,
     )
     error_prefixes = (
         "AI mode is not configured", "The AI service could not", "The AI service is temporarily",
@@ -1079,12 +1049,6 @@ def _generate_questions_batch(topic, source_text="", count=10, avoid_questions=N
         "I couldn't complete", "The AI tutor is temporarily",
     )
     if raw.startswith(error_prefixes):
-        if os.getenv("QUIZ_DEBUG_ERRORS", "false").strip().lower() in {"1", "true", "yes", "on"}:
-            g.quiz_debug_failure = {
-                "reason": "The AI provider returned an error message instead of quiz JSON.",
-                "first_response": (raw or "")[:1200],
-                "repair_response": "",
-            }
         return []
 
     # Keep good questions from a nearly complete response and ask only for the
@@ -1147,8 +1111,7 @@ def _generate_questions_batch(topic, source_text="", count=10, avoid_questions=N
                 "Return a compact, valid JSON object only. Do not include Markdown or commentary.",
                 max_tokens=450,
                 json_mode=False,
-                debug_quiz_response=True,
-            )
+                    )
             if repair_raw.startswith(error_prefixes):
                 app.logger.warning(
                     "AI quiz repair call returned provider error (attempt=%s, total_ready=%s)",
@@ -1178,9 +1141,6 @@ def _generate_questions_batch(topic, source_text="", count=10, avoid_questions=N
                     repair_index + 1, len(repair_raw or "")
                 )
                 continue
-            if os.getenv("QUIZ_DEBUG_ERRORS", "false").strip().lower() in {"1", "true", "yes", "on"}:
-                app.logger.info("AI quiz repair added question %s of %s", len(valid), count)
-
         app.logger.warning(
             "AI quiz repair validation (requested_missing=%s, parsed_items=%s, accepted_items=%s, total_ready=%s, raw_chars=%s, starts_with_json=%s, starts_with_fence=%s)",
             missing, len(repair_items) if isinstance(repair_items, list) else 0,
@@ -1193,15 +1153,6 @@ def _generate_questions_batch(topic, source_text="", count=10, avoid_questions=N
         for item in valid:
             item["_generated_by_ai"] = True
         return valid[:count]
-
-    # TEMPORARY diagnostics are available only when QUIZ_DEBUG_ERRORS=true.
-    # Keep previews bounded and request-scoped; never put document text or diagnostics in a cookie/session.
-    if os.getenv("QUIZ_DEBUG_ERRORS", "false").strip().lower() in {"1", "true", "yes", "on"}:
-        g.quiz_debug_failure = {
-            "reason": "The AI response did not pass quiz JSON/schema/source-evidence validation.",
-            "first_response": (raw or "")[:1200],
-            "repair_response": (repair_raw or "")[:1200] if "repair_raw" in locals() else "",
-        }
 
     # Do not fall back to repetitive sentence-recognition items: a failed generation
     # should be reported honestly rather than presented as a useful subject quiz.
@@ -1645,8 +1596,6 @@ def quiz():
                 active_record = None
 
     docs = LearningDocument.query.filter_by(owner_id=current_user.id).all()
-    quiz_debug_enabled = os.getenv("QUIZ_DEBUG_ERRORS", "false").strip().lower() in {"1", "true", "yes", "on"}
-    quiz_debug_failure = getattr(g, "quiz_debug_failure", None) if quiz_debug_enabled else None
     timer_deadline = active_record.timer_deadline if active_record and questions else None
     timer_duration_seconds = None
     if active_record and questions:
@@ -1657,8 +1606,7 @@ def quiz():
     return render_template("quiz.html", questions=questions, topic=topic, docs=docs,
                            quiz_source_label=quiz_source_label, question_count=question_count,
                            timer_minutes=timer_minutes, timer_deadline=timer_deadline,
-                           timer_duration_seconds=timer_duration_seconds,
-                           quiz_debug_enabled=quiz_debug_enabled, quiz_debug_failure=quiz_debug_failure)
+                           timer_duration_seconds=timer_duration_seconds)
 
 
 @app.route("/quiz-history")
@@ -1772,44 +1720,6 @@ def _api_attempt(attempt):
     return {"id": attempt.id, "topic": attempt.topic, "score": attempt.score, "total": attempt.total,
             "percentage": round(attempt.score / attempt.total * 100) if attempt.total else 0,
             "created_at": attempt.created_at.isoformat() if attempt.created_at else None}
-
-
-@app.get("/api/debug/auth-status")
-def api_debug_auth_status():
-    """TEMPORARY diagnostic endpoint; remove after Google OAuth is fixed.
-
-    Reports configuration presence only. It never returns credential values.
-    """
-    import importlib.metadata
-    try:
-        authlib_version = importlib.metadata.version("Authlib")
-        authlib_installed = True
-    except importlib.metadata.PackageNotFoundError:
-        authlib_version = None
-        authlib_installed = False
-
-    client_id_present = bool(os.getenv("GOOGLE_CLIENT_ID", "").strip())
-    client_secret_present = bool(os.getenv("GOOGLE_CLIENT_SECRET", "").strip())
-    return jsonify({
-        "diagnostic": "temporary_google_oauth_check",
-        "authlib_import_available": OAuth is not None,
-        "authlib_package_installed": authlib_installed,
-        "authlib_version": authlib_version,
-        "authlib_import_error_type": AUTHLIB_IMPORT_ERROR_TYPE,
-        "authlib_import_error_message": AUTHLIB_IMPORT_ERROR_MESSAGE,
-        "google_client_id_present": client_id_present,
-        "google_client_secret_present": client_secret_present,
-        "oauth_object_created": oauth is not None,
-        "google_oauth_client_initialized": google_oauth is not None,
-        "google_sign_in_enabled": bool(google_oauth),
-        "next_step_hint": (
-            "Authlib is missing or failed to import" if OAuth is None else
-            "One or both Google credential variables are empty/missing" if not (client_id_present and client_secret_present) else
-            "Credentials are present; inspect OAuth initialization and deployed revision"
-            if google_oauth is None else
-            "OAuth client initialized; investigate frontend button/redirect if sign-in still fails"
-        ),
-    })
 
 
 def _api_feedback(item):

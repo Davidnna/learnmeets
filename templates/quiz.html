@@ -1,10 +1,5 @@
 {% extends "base.html" %}{% block title %}Practice quiz{% endblock %}
 {% block content %}
-{% if quiz_debug_enabled and quiz_debug_failure %}<section class="panel" style="border:2px solid #b45309;margin-bottom:1rem" aria-labelledby="quiz-debug-heading">
-<h2 id="quiz-debug-heading">Temporary AI quiz diagnostics</h2><p><strong>Reason:</strong> {{ quiz_debug_failure.reason }}</p>
-<p class="muted">Temporary diagnostics. Disable with <code>QUIZ_DEBUG_ERRORS=false</code> in Render after troubleshooting.</p>
-<h3>Groq response (initial request)</h3><pre class="debug-preview">{{ quiz_debug_failure.first_response or "(No response captured)" }}</pre>
-{% if quiz_debug_failure.repair_response %}<h3>Groq response (repair request)</h3><pre class="debug-preview">{{ quiz_debug_failure.repair_response }}</pre>{% endif %}</section>{% endif %}
 <div class="page-heading"><div><div class="eyebrow">PRACTICE AND IMPROVE</div><h1>Practice quiz</h1><p class="muted">Generate questions, set a timer if you want, and revisit completed quizzes anytime.</p></div><a class="button secondary" href="{{ url_for('quiz_history') }}">Previous quizzes</a></div>
 {% if not questions %}<section class="panel quiz-start"><div class="quiz-art">✓</div><h2>What would you like to practice?</h2><p class="muted">Enter a topic or select your own course notes. Document quizzes use text extracted from your upload.</p>
 <form method="post" class="form-stack quiz-form" data-loading-message="Preparing your practice quiz…"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="generate">
