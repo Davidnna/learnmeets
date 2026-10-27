@@ -1979,7 +1979,12 @@ def api_reset_password():
 def google_login():
     if not google_oauth:
         return _frontend_redirect("/login?oauth=not-configured")
-    return google_oauth.authorize_redirect(url_for("google_callback", _external=True))
+    # Use the same-origin frontend callback in production so OAuth state and
+    # session cookies are set on the frontend origin via its /auth proxy.
+    callback_uri = os.getenv("GOOGLE_REDIRECT_URI", "").strip()
+    if not callback_uri:
+        callback_uri = url_for("google_callback", _external=True)
+    return google_oauth.authorize_redirect(callback_uri)
 
 
 @app.get("/auth/google/callback")
