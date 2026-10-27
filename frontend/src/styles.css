@@ -215,3 +215,33 @@
   .danger-actions{flex-direction:column;align-items:stretch}
   .danger-actions .button{width:100%;justify-content:center}
 }
+
+
+/* Accessible defaults for keyboard, touch, zoom, and Windows high-contrast modes. */
+:where(a,button,input,select,textarea,[tabindex]:not([tabindex="-1"])):focus-visible{
+  outline:3px solid #4b3cc4;
+  outline-offset:3px;
+}
+:where(button,a,input,select,textarea){touch-action:manipulation}
+:where(input,select,textarea){min-width:0;max-width:100%}
+:where(p,li,label,h1,h2,h3){overflow-wrap:anywhere}
+button:disabled,[aria-disabled="true"]{cursor:not-allowed}
+@media(forced-colors:active){
+  :where(a,button,input,select,textarea,[tabindex]:not([tabindex="-1"])):focus-visible{
+    outline:3px solid Highlight;
+  }
+  .brand-mark,.button-primary,.button-danger{forced-color-adjust:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
+@media(max-width:360px){
+  .auth-card{padding-inline:clamp(14px,4vw,22px)}
+  .auth-heading h1{font-size:clamp(1.35rem,7vw,1.8rem)}
+  .button{white-space:normal}
+}
