@@ -1,4 +1,6 @@
-export const API_BASE_URL = (import.meta.env.API_BASE_URL || '').replace(/\/$/, '');
+// Production uses same-origin Vercel rewrites so session and CSRF cookies are
+// first-party in the browser. Keep API_BASE_URL only for local/dev overrides.
+export const API_BASE_URL = (import.meta.env.DEV ? (import.meta.env.API_BASE_URL || '') : '').replace(/\/$/, '');
 const API_BASE = API_BASE_URL;
 let csrfToken = '';
 
@@ -9,7 +11,7 @@ async function readPayload(response) {
 
 async function ensureCsrf() {
   if (csrfToken) return csrfToken;
-  const response = await fetch(`${API_BASE}/api/session`, { credentials: 'include' });
+  const response = await fetch(`${API_BASE}/api/session`, { credentials: 'include', cache: 'no-store' });
   const payload = await readPayload(response);
   if (response.ok && payload && typeof payload === 'object') csrfToken = payload.csrf_token || '';
   return csrfToken;
@@ -22,8 +24,21 @@ export async function apiRequest(path, options = {}) {
     const token = await ensureCsrf();
     if (token) headers['X-CSRF-Token'] = token;
   }
-  const response = await fetch(`${API_BASE}${path}`, { credentials: 'include', ...options, method, headers });
-  const payload = await readPayload(response);
+  let response = await fetch(`${API_BASE}${path}`, { credentials: 'include', cache: 'no-store', ...options, method, headers });
+  let payload = await readPayload(response);
+  // A session may be rotated by login, OAuth, or another tab. Refresh the
+  // session-bound token once and retry only when the server explicitly rejects
+  // the CSRF token; never disable CSRF validation.
+  if (!response.ok && method !== 'GET' && response.status === 400 &&
+      typeof payload === 'object' && /security token/i.test(payload?.error || '')) {
+    csrfToken = '';
+    const freshToken = await ensureCsrf();
+    if (freshToken) {
+      headers['X-CSRF-Token'] = freshToken;
+      response = await fetch(`${API_BASE}${path}`, { credentials: 'include', cache: 'no-store', ...options, method, headers });
+      payload = await readPayload(response);
+    }
+  }
   if (!response.ok) {
     const message = typeof payload === 'object' && payload?.error ? payload.error : `Request failed (${response.status})`;
     if (response.status === 400 && /security token/i.test(message)) csrfToken = '';
